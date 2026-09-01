@@ -32,6 +32,10 @@ class FakeOllama:
 
     async def __call__(self, request: httpx.Request) -> httpx.Response:
         host = request.url.host or ""
+        if request.method == "GET" and request.url.path == "/api/version":
+            if self.behavior.get(host) == "offline":
+                raise httpx.ConnectError("offline", request=request)
+            return httpx.Response(200, json={"version": "0.33.2"})
         if request.method == "GET" and request.url.path == "/api/tags":
             if self.behavior.get(host) == "offline":
                 raise httpx.ConnectError("offline", request=request)
@@ -335,3 +339,104 @@ def test_registration_validation_auth_and_delete(tmp_path: Path) -> None:
         deleted = client.delete(f"/api/endpoints/{endpoint_id}", headers=headers)
         assert deleted.json() == {"deleted": True}
         assert client.get("/api/endpoints").json() == {"suppliers": []}
+
+
+def test_endpoint_diagnostic_reports_network_and_model_readiness(tmp_path: Path) -> None:
+    ollama = FakeOllama()
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        ready = client.post(
+            "/api/endpoints/diagnose",
+            json={
+                "base_url": "http://192.168.1.24:11434",
+                "model_name": "tinyllama",
+            },
+        )
+        assert ready.status_code == 200
+        assert ready.json() == {
+            "base_url": "http://192.168.1.24:11434",
+            "network_scope": "private",
+            "safe_for_lan": True,
+            "reachable": True,
+            "version": "0.33.2",
+            "models": ["tinyllama:latest"],
+            "requested_model": "tinyllama",
+            "model_available": True,
+            "ready": True,
+            "issues": [],
+        }
+
+        missing = client.post(
+            "/api/endpoints/diagnose",
+            json={
+                "base_url": "http://192.168.1.24:11434",
+                "model_name": "qwen2.5-coder",
+            },
+        ).json()
+        assert missing["reachable"] is True
+        assert missing["model_available"] is False
+        assert missing["ready"] is False
+        assert missing["issues"][0]["code"] == "model_missing"
+
+
+def test_endpoint_diagnostic_explains_offline_loopback_and_public_urls(
+    tmp_path: Path,
+) -> None:
+    ollama = FakeOllama()
+    ollama.behavior["127.0.0.1"] = "offline"
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        offline = client.post(
+            "/api/endpoints/diagnose",
+            json={
+                "base_url": "http://127.0.0.1:11434",
+                "model_name": "tinyllama",
+            },
+        ).json()
+        assert offline["network_scope"] == "loopback"
+        assert offline["reachable"] is False
+        assert offline["ready"] is False
+        assert {issue["code"] for issue in offline["issues"]} == {
+            "loopback_address",
+            "version_unavailable",
+            "endpoint_unreachable",
+        }
+
+        public = client.post(
+            "/api/endpoints/diagnose",
+            json={
+                "base_url": "http://8.8.8.8:11434",
+                "model_name": "tinyllama",
+            },
+        ).json()
+        assert public["reachable"] is False
+        assert public["safe_for_lan"] is False
+        assert public["ready"] is False
+        assert public["issues"][0]["code"] == "public_address"
+
+        hostname = client.post(
+            "/api/endpoints/diagnose",
+            json={
+                "base_url": "https://unverified.example.com:11434",
+                "model_name": "tinyllama",
+            },
+        ).json()
+        assert hostname["network_scope"] == "hostname"
+        assert hostname["reachable"] is False
+        assert hostname["issues"][0]["code"] == "unverified_hostname"
+
+
+def test_dashboard_cors_accepts_private_lan_origins_only(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(FakeOllama()))
+    with TestClient(app) as client:
+        private = client.get(
+            "/health", headers={"Origin": "http://192.168.1.10:3000"}
+        )
+        assert private.headers["access-control-allow-origin"] == (
+            "http://192.168.1.10:3000"
+        )
+
+        public = client.get(
+            "/health", headers={"Origin": "https://untrusted.example.com"}
+        )
+        assert "access-control-allow-origin" not in public.headers

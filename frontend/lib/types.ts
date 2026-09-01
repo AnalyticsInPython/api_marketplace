@@ -13,6 +13,33 @@ export interface Supplier {
   lastSeen: string | null; // ISO timestamp
 }
 
+export interface EndpointDiagnosticIssue {
+  code: string;
+  severity: "warning" | "error";
+  message: string;
+}
+
+export interface EndpointDiagnostic {
+  baseUrl: string;
+  networkScope: "loopback" | "private" | "public" | "hostname";
+  safeForLan: boolean;
+  reachable: boolean;
+  version: string | null;
+  models: string[];
+  requestedModel: string;
+  modelAvailable: boolean;
+  ready: boolean;
+  issues: EndpointDiagnosticIssue[];
+}
+
+export interface RoutedNetworkTest {
+  requestId: string;
+  supplierId: string;
+  supplierName: string;
+  content: string;
+  matchedExpectedReply: boolean;
+}
+
 export type DashboardEventType =
   | "supplier.online"
   | "supplier.busy"

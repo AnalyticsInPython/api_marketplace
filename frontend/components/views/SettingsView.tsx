@@ -1,6 +1,6 @@
 "use client";
 
-import { config } from "@/lib/config";
+import { config, resolveApiBaseUrl, resolveWsUrl } from "@/lib/config";
 import type { ConnectionMode } from "@/lib/types";
 
 function Row({ label, value, note }: { label: string; value: React.ReactNode; note?: string }) {
@@ -16,6 +16,8 @@ function Row({ label, value, note }: { label: string; value: React.ReactNode; no
 }
 
 export function SettingsView({ mode }: { mode: ConnectionMode }) {
+  const apiBaseUrl = resolveApiBaseUrl();
+  const wsUrl = resolveWsUrl();
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <div>
@@ -40,8 +42,8 @@ export function SettingsView({ mode }: { mode: ConnectionMode }) {
             )
           }
         />
-        <Row label="Central server" value={<code className="font-mono text-[12px] text-muted">{config.apiBaseUrl}</code>} note="NEXT_PUBLIC_API_BASE_URL" />
-        <Row label="Events WebSocket" value={<code className="font-mono text-[12px] text-muted">{config.wsUrl}</code>} note="NEXT_PUBLIC_WS_URL" />
+        <Row label="Central server" value={<code className="font-mono text-[12px] text-muted">{apiBaseUrl}</code>} note="NEXT_PUBLIC_API_BASE_URL" />
+        <Row label="Events WebSocket" value={<code className="font-mono text-[12px] text-muted">{wsUrl}</code>} note="NEXT_PUBLIC_WS_URL" />
         <Row label="Request timeout" value={<span className="tnum text-[13px] text-muted">120 s</span>} note="CPU inference can be slow (spec §9.5)" />
         <Row label="Offline detection" value={<span className="tnum text-[13px] text-muted">{(config.offlineAfterMs / 1000).toFixed(1)} s</span>} note="Before showing setup instructions" />
         <Row label="Automatic retry" value={<span className="tnum text-[13px] text-muted">{(config.reconnectMs / 1000).toFixed(0)} s</span>} note="While the router is offline" />

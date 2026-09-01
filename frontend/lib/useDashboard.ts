@@ -10,7 +10,7 @@
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { config } from "./config";
+import { config, resolveApiBaseUrl, resolveWsUrl } from "./config";
 import type {
   ActiveRequest,
   Completion,
@@ -18,8 +18,10 @@ import type {
   DashboardEvent,
   DashboardEventType,
   DashboardMetrics,
+  EndpointDiagnostic,
   FlowStage,
   LoadSample,
+  RoutedNetworkTest,
   Supplier,
   SupplierStatus,
 } from "./types";
@@ -84,6 +86,8 @@ const IDLE_REQUEST: ActiveRequest = {
 };
 
 export function useDashboard() {
+  const apiBaseUrl = resolveApiBaseUrl();
+  const wsUrl = resolveWsUrl();
   const [mode, setMode] = useState<ConnectionMode>("connecting");
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [events, setEvents] = useState<DashboardEvent[]>([]);
@@ -154,7 +158,7 @@ export function useDashboard() {
 
     const fetchSuppliers = async () => {
       try {
-        const res = await fetch(`${config.apiBaseUrl}/api/endpoints`, {
+        const res = await fetch(`${apiBaseUrl}/api/endpoints`, {
           headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
         });
         if (!res.ok) return;
@@ -179,7 +183,7 @@ export function useDashboard() {
       if (showConnecting) setModeBoth("connecting");
       let ws: WebSocket;
       try {
-        ws = new WebSocket(config.wsUrl);
+        ws = new WebSocket(wsUrl);
       } catch {
         markOffline();
         scheduleReconnect();
@@ -325,7 +329,7 @@ export function useDashboard() {
         stage: "toServer",
       });
       try {
-        const res = await fetch(`${config.apiBaseUrl}/api/prompts`, {
+        const res = await fetch(`${apiBaseUrl}/api/prompts`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -372,6 +376,91 @@ export function useDashboard() {
     retryConnectionRef.current();
   }, []);
 
+  const diagnoseEndpoint = useCallback(async (
+    baseUrl: string,
+    modelName: string,
+  ): Promise<{ diagnostic: EndpointDiagnostic | null; error: string | null }> => {
+    if (modeRef.current !== "live") {
+      return { diagnostic: null, error: "The marketplace router is offline." };
+    }
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/endpoints/diagnose`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+        },
+        body: JSON.stringify({ base_url: baseUrl, model_name: modelName }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          diagnostic: null,
+          error: data?.detail?.[0]?.msg ?? data?.detail ?? `Network checks failed (${res.status})`,
+        };
+      }
+      return {
+        diagnostic: {
+          baseUrl: String(data.base_url),
+          networkScope: data.network_scope,
+          safeForLan: Boolean(data.safe_for_lan),
+          reachable: Boolean(data.reachable),
+          version: data.version == null ? null : String(data.version),
+          models: Array.isArray(data.models) ? data.models.map(String) : [],
+          requestedModel: String(data.requested_model),
+          modelAvailable: Boolean(data.model_available),
+          ready: Boolean(data.ready),
+          issues: Array.isArray(data.issues) ? data.issues : [],
+        },
+        error: null,
+      };
+    } catch {
+      return { diagnostic: null, error: "Could not reach the marketplace router." };
+    }
+  }, []);
+
+  const runNetworkTest = useCallback(async (): Promise<{
+    result: RoutedNetworkTest | null;
+    error: string | null;
+  }> => {
+    if (modeRef.current !== "live") {
+      return { result: null, error: "The marketplace router is offline." };
+    }
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/prompts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          prompt: "Reply with exactly: REMOTE_TEST_OK",
+          client_label: `dashboard-network-check-${Date.now()}`,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return {
+          result: null,
+          error: data?.detail ?? data?.error ?? `Routed test failed (${res.status})`,
+        };
+      }
+      const content = String(data.content ?? "");
+      return {
+        result: {
+          requestId: String(data.request_id ?? ""),
+          supplierId: String(data.supplier_id ?? data.endpoint_id ?? ""),
+          supplierName: String(data.supplier_name ?? data.endpoint_name ?? "Unknown endpoint"),
+          content,
+          matchedExpectedReply: content.includes("REMOTE_TEST_OK"),
+        },
+        error: null,
+      };
+    } catch {
+      return { result: null, error: "Could not reach the marketplace router." };
+    }
+  }, []);
+
   const registerEndpoint = useCallback(async (
     name: string,
     baseUrl: string,
@@ -379,7 +468,7 @@ export function useDashboard() {
   ): Promise<string | null> => {
     if (modeRef.current !== "live") return "The marketplace router is offline. Reconnect before registering an endpoint.";
     try {
-      const res = await fetch(`${config.apiBaseUrl}/api/endpoints`, {
+      const res = await fetch(`${apiBaseUrl}/api/endpoints`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -433,6 +522,8 @@ export function useDashboard() {
     completions,
     submitPrompt,
     registerEndpoint,
+    diagnoseEndpoint,
+    runNetworkTest,
     retryConnection,
     busy,
   };

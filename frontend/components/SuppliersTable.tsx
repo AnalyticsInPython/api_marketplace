@@ -78,7 +78,7 @@ export function SuppliersTable({
                         <span className="text-online">
                           <IconPin size={13} />
                         </span>
-                        {s.baseUrl || "—"}
+                        {s.baseUrl || "Not available"}
                       </span>
                     </td>
                     <td>

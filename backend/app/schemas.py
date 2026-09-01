@@ -61,3 +61,23 @@ class EndpointCreate(BaseModel):
         if not normalized.startswith(("http://", "https://")):
             raise ValueError("base_url must start with http:// or https://")
         return normalized
+
+
+class EndpointDiagnosticRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_url: str = Field(min_length=8, max_length=500)
+    model_name: str = Field(default="qwen2.5-coder", min_length=1, max_length=200)
+
+    @field_validator("model_name")
+    @classmethod
+    def strip_model_name(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        normalized = value.strip().rstrip("/")
+        if not normalized.startswith(("http://", "https://")):
+            raise ValueError("base_url must start with http:// or https://")
+        return normalized

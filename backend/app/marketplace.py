@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import json
 import uuid
 from collections import deque
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import WebSocket
@@ -438,6 +440,153 @@ class Marketplace:
             raise EndpointInferenceError(
                 f"model {model_name!r} is not installed on that endpoint"
             )
+
+    async def diagnose_endpoint(
+        self, base_url: str, model_name: str
+    ) -> dict[str, Any]:
+        """Inspect an Ollama URL without adding it to the registry."""
+        parsed = urlparse(base_url)
+        host = parsed.hostname or ""
+        network_scope = "hostname"
+        if host.endswith(".local"):
+            network_scope = "private"
+        else:
+            try:
+                address = ipaddress.ip_address(host)
+                if address.is_loopback:
+                    network_scope = "loopback"
+                elif address.is_private or address.is_link_local:
+                    network_scope = "private"
+                else:
+                    network_scope = "public"
+            except ValueError:
+                pass
+
+        issues: list[dict[str, str]] = []
+        if network_scope == "loopback":
+            issues.append(
+                {
+                    "code": "loopback_address",
+                    "severity": "warning",
+                    "message": (
+                        "This address only works when the router and Ollama run "
+                        "on the same computer. Use the supplier Mac's Wi-Fi IP "
+                        "for network access."
+                    ),
+                }
+            )
+        elif network_scope == "public":
+            issues.append(
+                {
+                    "code": "public_address",
+                    "severity": "error",
+                    "message": (
+                        "Public Ollama addresses are not allowed. Use a trusted "
+                        "private-network address and never expose port 11434 to "
+                        "the internet."
+                    ),
+                }
+            )
+        elif network_scope == "hostname":
+            issues.append(
+                {
+                    "code": "unverified_hostname",
+                    "severity": "error",
+                    "message": (
+                        "Use a private IP address or a .local hostname so the "
+                        "router does not probe an unverified internet host."
+                    ),
+                }
+            )
+
+        safe_for_lan = network_scope in {"loopback", "private"}
+        if not safe_for_lan:
+            return {
+                "base_url": base_url,
+                "network_scope": network_scope,
+                "safe_for_lan": False,
+                "reachable": False,
+                "version": None,
+                "models": [],
+                "requested_model": model_name,
+                "model_available": False,
+                "ready": False,
+                "issues": issues,
+            }
+
+        version: str | None = None
+        try:
+            response = await self._client.get(
+                f"{base_url}/api/version",
+                timeout=self.settings.health_timeout_seconds,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            raw_version = payload.get("version") if isinstance(payload, dict) else None
+            if raw_version is not None:
+                version = str(raw_version)
+        except (httpx.HTTPError, ValueError):
+            issues.append(
+                {
+                    "code": "version_unavailable",
+                    "severity": "warning",
+                    "message": "The router could not read Ollama's /api/version response.",
+                }
+            )
+
+        installed: list[str] = []
+        reachable = False
+        try:
+            response = await self._client.get(
+                f"{base_url}/api/tags",
+                timeout=self.settings.health_timeout_seconds,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            installed = sorted(
+                str(model.get("name", ""))
+                for model in payload.get("models", [])
+                if isinstance(model, dict) and model.get("name")
+            )
+            reachable = True
+        except (httpx.HTTPError, ValueError):
+            issues.append(
+                {
+                    "code": "endpoint_unreachable",
+                    "severity": "error",
+                    "message": (
+                        "The router could not reach /api/tags. Check the IP, "
+                        "Ollama bind address, firewall, Wi-Fi, and VPN."
+                    ),
+                }
+            )
+
+        requested_base = model_name.split(":", 1)[0]
+        model_available = reachable and (
+            model_name in installed
+            or any(item.split(":", 1)[0] == requested_base for item in installed)
+        )
+        if reachable and not model_available:
+            issues.append(
+                {
+                    "code": "model_missing",
+                    "severity": "error",
+                    "message": f"Model {model_name!r} is not installed on this Ollama endpoint.",
+                }
+            )
+
+        return {
+            "base_url": base_url,
+            "network_scope": network_scope,
+            "safe_for_lan": safe_for_lan,
+            "reachable": reachable,
+            "version": version,
+            "models": installed,
+            "requested_model": model_name,
+            "model_available": model_available,
+            "ready": reachable and model_available,
+            "issues": issues,
+        }
 
     async def _set_online(self, endpoint_id: str, online: bool) -> None:
         async with self._lock:

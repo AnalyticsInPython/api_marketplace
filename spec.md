@@ -19,6 +19,12 @@ dashboard can register Ollama endpoints, use the real prompt route, and show
 setup instructions when the live backend is unavailable. It never substitutes
 mock suppliers, requests, events, or telemetry for marketplace state.
 
+Supplier onboarding is assisted, not agent-based. The dashboard provides a
+downloadable one-time macOS helper, while the router diagnoses the resulting
+Ollama URL over the network before registration. A browser cannot silently
+change another Mac's firewall or processes, so a supplier operator must run the
+helper and approve any macOS firewall prompt.
+
 OpenCode compatibility is implemented through an OpenAI-compatible SSE adapter.
 The router still holds each supplier reservation through a non-streaming Ollama
 completion, then emits the completed text or tool call as SSE frames. OpenCode
@@ -143,6 +149,17 @@ http://192.168.1.24:11434
 The dashboard must:
 
 - Register an endpoint using a display name and local-network URL.
+- Provide a downloadable macOS helper that pulls Qwen, configures the permanent
+  Ollama network bind, restarts Ollama, and prints the supplier URL.
+- Diagnose a proposed endpoint from the router by checking `/api/version`,
+  `/api/tags`, the requested model, and whether the address is safe for a
+  trusted local network.
+- Prevent public Ollama addresses from passing onboarding diagnostics.
+- Send a real `REMOTE_TEST_OK` prompt through normal marketplace routing and
+  report the supplier that answered.
+- In automatic network mode, derive the API and WebSocket host from the
+  dashboard page hostname so LAN clients do not resolve the router as their own
+  localhost.
 - Show registered endpoints and their model/status.
 - Show `online`, `busy`, and `offline` states.
 - Provide a prompt simulator that uses the real router path.
@@ -211,6 +228,8 @@ completed Ollama response as OpenAI-compatible SSE frames.
 
 - `GET /api/endpoints` — registered endpoints and current status
 - `POST /api/endpoints` — register and validate an Ollama endpoint
+- `POST /api/endpoints/diagnose` — test reachability, Ollama version, model, and
+  private-network safety without changing the registry
 - `DELETE /api/endpoints/{id}` — remove an endpoint
 - `POST /api/prompts` — dashboard prompt simulator using the normal routing service
 - `WS /ws/dashboard` — live endpoint and request events

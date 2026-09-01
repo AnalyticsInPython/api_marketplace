@@ -1,6 +1,7 @@
 "use client";
 
-import { config } from "@/lib/config";
+import { useEffect, useState } from "react";
+import { resolveApiBaseUrl } from "@/lib/config";
 import type { ConnectionMode } from "@/lib/types";
 
 function SetupRow({
@@ -33,6 +34,11 @@ export function ConnectionSetup({
   onRetry: () => void;
 }) {
   const connecting = mode === "connecting";
+  const [apiBaseUrl, setApiBaseUrl] = useState("http://localhost:8000");
+
+  useEffect(() => {
+    setApiBaseUrl(resolveApiBaseUrl());
+  }, []);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-4 py-4 sm:py-8">
@@ -72,14 +78,14 @@ export function ConnectionSetup({
           />
           <SetupRow
             title="Confirm health"
-            detail={`The configured dashboard API is ${config.apiBaseUrl}. A healthy router returns {\"status\":\"ok\"}.`}
-            command={`curl ${config.apiBaseUrl}/health`}
+            detail={`The configured dashboard API is ${apiBaseUrl}. A healthy router returns {\"status\":\"ok\"}.`}
+            command={`curl ${apiBaseUrl}/health`}
           />
         </div>
 
         <div className="flex flex-col gap-3 border-t border-line bg-panel-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[12px] text-dim">
-            If the router runs on another Mac, update NEXT_PUBLIC_API_BASE_URL and NEXT_PUBLIC_WS_URL in frontend/.env.local.
+            Auto mode uses this dashboard&apos;s hostname on port 8000. Set explicit URLs only when the dashboard and router use different hosts.
           </p>
           <button className="btn btn-primary shrink-0" onClick={onRetry} disabled={connecting}>
             {connecting ? "Checking..." : "Retry connection"}

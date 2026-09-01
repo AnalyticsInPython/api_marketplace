@@ -13,7 +13,12 @@ from fastapi.responses import StreamingResponse
 from .config import Settings
 from .database import EndpointRegistry
 from .marketplace import Marketplace, MarketplaceError
-from .schemas import ChatCompletionRequest, EndpointCreate, SimulationRequest
+from .schemas import (
+    ChatCompletionRequest,
+    EndpointCreate,
+    EndpointDiagnosticRequest,
+    SimulationRequest,
+)
 
 
 def create_app(
@@ -43,6 +48,7 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=resolved_settings.allowed_origins,
+        allow_origin_regex=resolved_settings.allowed_origin_regex,
         allow_credentials=False,
         allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-Client-ID"],
@@ -226,6 +232,10 @@ def create_app(
             "active_requests": 0,
             "last_seen_at": record.last_seen_at,
         }
+
+    @app.post("/api/endpoints/diagnose", dependencies=[Depends(require_api_key)])
+    async def diagnose_endpoint(body: EndpointDiagnosticRequest) -> dict[str, Any]:
+        return await marketplace.diagnose_endpoint(body.base_url, body.model_name)
 
     @app.delete("/api/endpoints/{endpoint_id}", dependencies=[Depends(require_api_key)])
     async def delete_endpoint(endpoint_id: str) -> dict[str, bool]:

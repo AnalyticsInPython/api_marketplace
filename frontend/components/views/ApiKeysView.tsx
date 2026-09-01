@@ -1,6 +1,6 @@
 "use client";
 
-import { config } from "@/lib/config";
+import { config, resolveApiBaseUrl, resolveWsUrl } from "@/lib/config";
 
 function Row({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
@@ -17,9 +17,11 @@ function Row({ label, value, note }: { label: string; value: string; note?: stri
 }
 
 export function ApiKeysView() {
+  const apiBaseUrl = resolveApiBaseUrl();
+  const wsUrl = resolveWsUrl();
   const maskedKey = config.apiKey
     ? `${"•".repeat(Math.max(0, config.apiKey.length - 4))}${config.apiKey.slice(-4)}`
-    : "— not set (NEXT_PUBLIC_API_KEY)";
+    : "Not set (NEXT_PUBLIC_API_KEY)";
 
   const snippet = `{
   "$schema": "https://opencode.ai/config.json",
@@ -29,7 +31,7 @@ export function ApiKeysView() {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Local LLM Marketplace",
       "options": {
-        "baseURL": "${config.apiBaseUrl}/v1",
+        "baseURL": "${apiBaseUrl}/v1",
         "apiKey": "{env:MARKETPLACE_API_KEY}"
       },
       "models": {
@@ -44,15 +46,15 @@ export function ApiKeysView() {
       <div>
         <h1 className="text-[19px] font-semibold text-ink">API keys</h1>
         <p className="mt-1 text-[13px] text-muted">
-          One shared bearer token authenticates all user requests (spec §10.1). This is a local-network POC —
+          One shared bearer token authenticates all user requests (spec §10.1). This local-network POC is
           not a production security design.
         </p>
       </div>
 
       <div className="panel overflow-hidden">
-        <Row label="Base URL" value={`${config.apiBaseUrl}/v1`} note="OpenAI-compatible endpoint" />
-        <Row label="Dashboard WebSocket" value={config.wsUrl} note="Live endpoint & request events" />
-        <Row label="Public model" value="local-marketplace" note="Virtual model — routes to an Ollama endpoint" />
+        <Row label="Base URL" value={`${apiBaseUrl}/v1`} note="OpenAI-compatible endpoint" />
+        <Row label="Dashboard WebSocket" value={wsUrl} note="Live endpoint & request events" />
+        <Row label="Public model" value="local-marketplace" note="Virtual model routed to an Ollama endpoint" />
         <Row label="Shared API key" value={maskedKey} note="Sent as Authorization: Bearer <key>" />
       </div>
 

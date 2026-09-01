@@ -21,6 +21,8 @@ Team members looking for a concise progress handoff should start with
 - OpenAI tool definition/message forwarding, including a Qwen JSON tool-call shim
 - Endpoint registration, prompt simulation, and live dashboard WebSocket APIs
 - Live-only dashboard integration with offline setup instructions and reconnect
+- Router-side Ollama network diagnostics and a real marketplace route test
+- Downloadable macOS supplier setup helper for Qwen and trusted-LAN access
 
 There is no supplier agent. Each supplier Mac exposes Ollama directly on the
 trusted local network, as required by the current architecture in
@@ -42,6 +44,21 @@ affinity, active requests, and event history remain in memory.
 
 ## Prepare each Ollama Mac
 
+The dashboard Endpoints view now provides a downloadable setup helper. On the
+supplier Mac, download it from the dashboard and run:
+
+```bash
+chmod +x ~/Downloads/configure-ollama-macos.sh
+~/Downloads/configure-ollama-macos.sh
+```
+
+The helper pulls `qwen2.5-coder:1.5b`, sets the permanent `OLLAMA_HOST`, restarts
+Ollama, checks port `11434`, and prints the Wi-Fi endpoint URL. macOS may still
+require the operator to approve its firewall prompt. Restore localhost-only mode
+with `~/Downloads/configure-ollama-macos.sh --restore-localhost`.
+
+The equivalent manual setup remains:
+
 ```bash
 ollama pull qwen2.5-coder
 launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
@@ -60,10 +77,19 @@ npm install
 npm run dev -- --hostname 0.0.0.0
 ```
 
-If the router is on another Mac, update `NEXT_PUBLIC_API_BASE_URL`,
-`NEXT_PUBLIC_WS_URL`, and `NEXT_PUBLIC_API_KEY` in `frontend/.env.local`.
+The default `auto` values derive the API and WebSocket host from the dashboard
+URL. A teammate opening `http://192.168.1.10:3000` therefore connects to the
+router at `192.168.1.10:8000`. Set explicit URLs only when the dashboard and
+router use different hosts. Set `NEXT_PUBLIC_API_KEY` when authentication is
+enabled. The backend accepts dashboard origins from localhost, private IPv4
+ranges, and `.local` hostnames by default. Set `ALLOWED_ORIGIN_REGEX` to narrow
+that policy for a specific network.
 Open the Endpoints view to register each Ollama URL. Registration succeeds only
-when the router can reach `/api/tags` and find the configured model.
+when the router can reach `/api/tags` and find the configured model. Use **Run
+network checks** first to inspect the Ollama version, installed models, address
+scope, and any actionable connection problem. Use **Send routed test** to verify
+the complete dashboard to router to Ollama path with a real `REMOTE_TEST_OK`
+prompt.
 
 ## API surface
 
@@ -73,6 +99,7 @@ GET    /v1/models
 POST   /v1/chat/completions
 GET    /api/endpoints
 POST   /api/endpoints
+POST   /api/endpoints/diagnose
 DELETE /api/endpoints/{id}
 POST   /api/prompts
 WS     /ws/dashboard
@@ -80,6 +107,11 @@ WS     /ws/dashboard
 
 Compatibility aliases remain available at `GET /api/suppliers` and
 `POST /api/simulate` for the earlier dashboard contract.
+
+`POST /api/endpoints/diagnose` is router-side. A passing result proves the
+router can reach the supplied Ollama URL over the network. It warns about
+localhost-only URLs and rejects public IP addresses because Ollama has no API
+authentication.
 
 Example request:
 

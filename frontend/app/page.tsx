@@ -89,6 +89,8 @@ export default function Console() {
                 suppliers={dash.suppliers}
                 activeSupplierId={activeSupplierId}
                 onRegister={dash.registerEndpoint}
+                onDiagnose={dash.diagnoseEndpoint}
+                onNetworkTest={dash.runNetworkTest}
               />
             )}
             {dash.mode === "live" && view === "playground" && (

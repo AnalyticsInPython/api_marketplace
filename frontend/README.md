@@ -18,11 +18,25 @@ and verify `/health`. It retries automatically every five seconds and also
 provides a manual Retry connection action. The top bar reports `Live`,
 `Connecting`, or `Router offline`.
 
+The Endpoints view also includes the real supplier onboarding path:
+
+- Download and run the one-time macOS helper on the supplier Mac.
+- Paste its printed Wi-Fi URL into the dashboard.
+- Run router-side checks for `/api/version`, `/api/tags`, model availability,
+  and trusted-network address scope.
+- Register only after those checks pass.
+- Send `REMOTE_TEST_OK` through the normal marketplace route and see which
+  supplier answered.
+
+The UI cannot modify another Mac without code running there. The downloaded
+helper is the explicit supplier-side action; all subsequent validation,
+registration, health polling, routing, and testing are controlled in the UI.
+
 ## Quick start
 
 ```bash
 npm install
-cp .env.example .env.local   # optional — defaults target localhost:8000
+cp .env.example .env.local   # auto mode follows the dashboard hostname
 npm run dev
 ```
 
@@ -50,8 +64,8 @@ All settings are env vars (see `.env.example`):
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | FastAPI base URL (`/api/endpoints`, `/api/prompts`) | `http://localhost:8000` |
-| `NEXT_PUBLIC_WS_URL` | Dashboard events WebSocket (`WS /ws/dashboard`) | `ws://localhost:8000/ws/dashboard` |
+| `NEXT_PUBLIC_API_BASE_URL` | FastAPI base URL (`/api/endpoints`, `/api/prompts`); `auto` uses the dashboard hostname on port 8000 | `auto` |
+| `NEXT_PUBLIC_WS_URL` | Dashboard events WebSocket; `auto` uses the dashboard hostname on port 8000 | `auto` |
 | `NEXT_PUBLIC_API_KEY` | Shared bearer token, if the dashboard endpoints require it | _(empty)_ |
 
 ### Expected backend payloads

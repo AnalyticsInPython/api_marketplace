@@ -33,10 +33,19 @@ export function DocsView() {
         service as the OpenAI-compatible API.
         <Code>{`GET    /api/endpoints       # registry + live states
 POST   /api/endpoints       # validate and register Ollama
+POST   /api/endpoints/diagnose # network + model checks
 DELETE /api/endpoints/{id}  # remove an endpoint
 POST   /api/prompts         # { prompt, client_label } -> completion
 GET    /health              # router health
 POST /v1/chat/completions  # OpenAI-compatible (used by OpenCode)`}</Code>
+      </Section>
+
+      <Section title="Supplier onboarding">
+        Download the macOS helper from the Endpoints view and run it on the
+        supplier Mac. The UI then asks the router to check Ollama&apos;s version,
+        installed models, and private-network address before registration. The
+        routed test sends a real prompt through the marketplace and reports the
+        supplier that answered.
       </Section>
 
       <Section title="Routing behavior">
@@ -68,8 +77,8 @@ request.processing  request.completed  request.failed`}</Code>
       </Section>
 
       <Section title="Field normalization">
-        Payload field names are read permissively — <span className="font-mono text-[12px]">snake_case</span> and
-        <span className="font-mono text-[12px]"> camelCase</span> both work — so minor backend differences won&apos;t
+        Payload field names are read permissively. <span className="font-mono text-[12px]">snake_case</span> and
+        <span className="font-mono text-[12px]"> camelCase</span> both work, so minor backend differences won&apos;t
         break the UI. Endpoints include
         <span className="font-mono text-[12px]"> id, name, base_url, model_name, status, active_requests, last_seen_at</span>.
       </Section>
