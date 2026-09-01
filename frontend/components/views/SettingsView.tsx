@@ -44,6 +44,17 @@ export function SettingsView({ mode }: { mode: ConnectionMode }) {
         />
         <Row label="Central server" value={<code className="font-mono text-[12px] text-muted">{apiBaseUrl}</code>} note="NEXT_PUBLIC_API_BASE_URL" />
         <Row label="Events WebSocket" value={<code className="font-mono text-[12px] text-muted">{wsUrl}</code>} note="NEXT_PUBLIC_WS_URL" />
+        <Row
+          label="API authentication"
+          value={
+            config.apiKey ? (
+              <span className="badge badge-online"><span className="dot" />Configured</span>
+            ) : (
+              <span className="badge badge-offline"><span className="dot" />Not configured</span>
+            )
+          }
+          note="NEXT_PUBLIC_API_KEY (value is never displayed)"
+        />
         <Row label="Request timeout" value={<span className="tnum text-[13px] text-muted">120 s</span>} note="CPU inference can be slow (spec §9.5)" />
         <Row label="Offline detection" value={<span className="tnum text-[13px] text-muted">{(config.offlineAfterMs / 1000).toFixed(1)} s</span>} note="Before showing setup instructions" />
         <Row label="Automatic retry" value={<span className="tnum text-[13px] text-muted">{(config.reconnectMs / 1000).toFixed(0)} s</span>} note="While the router is offline" />

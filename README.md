@@ -38,9 +38,12 @@ cp backend/.env.example backend/.env
   --host 0.0.0.0 --port 8000 --env-file backend/.env
 ```
 
-Set `MARKETPLACE_API_KEY=` in `backend/.env` to disable user API authentication
-for a trusted local demo. SQLite stores endpoint registrations; busy state,
-affinity, active requests, and event history remain in memory.
+The example enables authentication with the trusted-LAN demo value
+`dev-marketplace-key`. Change `MARKETPLACE_API_KEY` in `backend/.env` for your
+network, then use the same value for the dashboard and OpenCode. Set it to an
+empty value only when you intentionally want to disable authentication. SQLite
+stores endpoint registrations; busy state, affinity, active requests, and event
+history remain in memory.
 
 ## Prepare each Ollama Mac
 
@@ -80,10 +83,13 @@ npm run dev -- --hostname 0.0.0.0
 The default `auto` values derive the API and WebSocket host from the dashboard
 URL. A teammate opening `http://192.168.1.10:3000` therefore connects to the
 router at `192.168.1.10:8000`. Set explicit URLs only when the dashboard and
-router use different hosts. Set `NEXT_PUBLIC_API_KEY` when authentication is
-enabled. The backend accepts dashboard origins from localhost, private IPv4
-ranges, and `.local` hostnames by default. Set `ALLOWED_ORIGIN_REGEX` to narrow
-that policy for a specific network.
+router use different hosts. `frontend/.env.example` uses the same trusted-LAN
+demo key as the backend; if you change `MARKETPLACE_API_KEY`, set
+`NEXT_PUBLIC_API_KEY` to the same value. Because `NEXT_PUBLIC_*` values are
+visible in the browser, this shared key is appropriate only for the local POC.
+The backend accepts dashboard origins from localhost, private IPv4 ranges, and
+`.local` hostnames by default. Set `ALLOWED_ORIGIN_REGEX` to narrow that policy
+for a specific network.
 Open the Endpoints view to register each Ollama URL. Registration succeeds only
 when the router can reach `/api/tags` and find the configured model. Use **Run
 network checks** first to inspect the Ollama version, installed models, address
@@ -155,9 +161,18 @@ Create `opencode.json` in the project OpenCode will operate on:
 ```
 
 The checked-in `opencode.json` already points OpenCode Desktop at the local
-router, selects `marketplace/local-marketplace`, and declares Qwen2.5-Coder's
-32K context window. Open the repository as a project in OpenCode and choose
-`Local Marketplace` if it is not selected automatically.
+router, reads its API key from `MARKETPLACE_API_KEY`, selects
+`marketplace/local-marketplace`, and declares Qwen2.5-Coder's 32K context
+window. Export the same value configured in `backend/.env` before launching
+OpenCode:
+
+```bash
+export MARKETPLACE_API_KEY="dev-marketplace-key"
+opencode
+```
+
+Open the repository as a project in OpenCode and choose `Local Marketplace` if
+it is not selected automatically. A missing or mismatched key returns HTTP 401.
 
 OpenCode requests streaming responses, while the router deliberately keeps the
 supplier reservation until a non-streaming Ollama completion finishes. The
