@@ -98,13 +98,19 @@ export default function Console() {
                 request={dash.request}
                 busy={dash.busy}
                 events={dash.events}
+                onlineSupplierCount={dash.suppliers.filter((supplier) => supplier.status === "online").length}
                 onSubmit={dash.submitPrompt}
               />
             )}
             {dash.mode === "live" && view === "events" && <EventsView events={dash.events} />}
             {dash.mode === "live" && view === "apikeys" && <ApiKeysView />}
             {dash.mode === "live" && view === "settings" && <SettingsView mode={dash.mode} />}
-            {dash.mode === "live" && view === "docs" && <DocsView />}
+            {dash.mode === "live" && view === "docs" && (
+              <DocsView
+                onOpenPlayground={() => setView("playground")}
+                onOpenSuppliers={() => setView("suppliers")}
+              />
+            )}
           </div>
         </main>
       </div>

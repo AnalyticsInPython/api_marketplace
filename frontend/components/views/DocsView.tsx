@@ -17,9 +17,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-export function DocsView() {
+export function DocsView({
+  onOpenPlayground,
+  onOpenSuppliers,
+}: {
+  onOpenPlayground: () => void;
+  onOpenSuppliers: () => void;
+}) {
   return (
-    <div className="flex max-w-3xl flex-col gap-4">
+    <div className="flex max-w-5xl flex-col gap-4">
       <div>
         <h1 className="text-[19px] font-semibold text-ink">Documentation</h1>
         <p className="mt-1 text-[13px] text-muted">
@@ -27,6 +33,43 @@ export function DocsView() {
           live router and shows setup instructions whenever that connection is unavailable.
         </p>
       </div>
+
+      <section className="panel overflow-hidden" aria-labelledby="role-guide-title">
+        <div className="border-b border-line px-5 py-5">
+          <h2 id="role-guide-title" className="text-[15px] font-semibold text-ink">Getting started by role</h2>
+          <p className="mt-1 text-[12.5px] text-muted">
+            Users send requests. Suppliers connect a Mac that can run those requests.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2">
+          <div className="px-5 py-5">
+            <div className="text-[12px] font-semibold text-ink">For users</div>
+            <h3 className="mt-1 text-[14px] font-semibold text-ink">Submit a request</h3>
+            <ol className="mt-3 grid gap-2 text-[12px] leading-relaxed text-muted">
+              <li>1. Open Playground. No download is required for the browser option.</li>
+              <li>2. Enter a prompt and select Run prompt.</li>
+              <li>3. Review the response, route, and live events.</li>
+              <li>4. For OpenCode, download the client and open this configured project.</li>
+            </ol>
+            <button className="btn btn-primary mt-4" onClick={onOpenPlayground}>
+              Open user instructions
+            </button>
+          </div>
+          <div className="border-t border-line bg-panel-2 px-5 py-5 md:border-l md:border-t-0">
+            <div className="text-[12px] font-semibold text-ink">For suppliers</div>
+            <h3 className="mt-1 text-[14px] font-semibold text-ink">Connect a Mac</h3>
+            <ol className="mt-3 grid gap-2 text-[12px] leading-relaxed text-muted">
+              <li>1. Install and launch Ollama on a trusted local network.</li>
+              <li>2. Download and run the marketplace setup helper.</li>
+              <li>3. Copy the printed endpoint URL and run network checks.</li>
+              <li>4. Submit the endpoint and send a routed test.</li>
+            </ol>
+            <button className="btn btn-ghost mt-4" onClick={onOpenSuppliers}>
+              Open supplier instructions
+            </button>
+          </div>
+        </div>
+      </section>
 
       <Section title="REST endpoints">
         The console reads the endpoint registry and submits prompts through the same routing
@@ -62,9 +105,9 @@ POST /v1/chat/completions  # OpenAI-compatible (used by OpenCode)`}</Code>
 {
   "event": "request.assigned",
   "timestamp": "2026-09-01T12:00:00Z",
-  "request_id": "chatcmpl-…",
+  "request_id": "<request-id>",
   "client_label": "OpenCode client",
-  "endpoint_id": "…",
+  "endpoint_id": "<endpoint-id>",
   "endpoint_name": "Omer's Mac"
 }`}</Code>
       </Section>

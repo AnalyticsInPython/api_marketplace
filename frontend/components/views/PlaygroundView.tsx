@@ -4,16 +4,19 @@ import type { ActiveRequest, DashboardEvent } from "@/lib/types";
 import { RequestSimulator } from "@/components/RequestSimulator";
 import { FlowDiagram } from "@/components/FlowDiagram";
 import { EventFeed } from "@/components/EventFeed";
+import { UserSetupGuide } from "@/components/UserSetupGuide";
 
 export function PlaygroundView({
   request,
   busy,
   events,
+  onlineSupplierCount,
   onSubmit,
 }: {
   request: ActiveRequest;
   busy: boolean;
   events: DashboardEvent[];
+  onlineSupplierCount: number;
   onSubmit: (p: string) => void;
 }) {
   return (
@@ -25,8 +28,12 @@ export function PlaygroundView({
         </p>
       </div>
 
+      <UserSetupGuide onlineSupplierCount={onlineSupplierCount} />
+
       {/* Full-width prompt bar */}
-      <RequestSimulator request={request} busy={busy} onSubmit={onSubmit} />
+      <div id="prompt-submission" className="scroll-mt-24">
+        <RequestSimulator request={request} busy={busy} onSubmit={onSubmit} />
+      </div>
 
       {/* Full-width routing */}
       <FlowDiagram request={request} />
