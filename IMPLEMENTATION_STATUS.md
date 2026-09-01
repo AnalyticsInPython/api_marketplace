@@ -36,6 +36,11 @@ is in [`spec.md`](spec.md), and complete setup commands are in
 - Supplier tables now show the actual Ollama base URL.
 - Endpoint and request events update status, charts, routing visualization, and
   the event log live.
+- OpenCode Desktop loads the checked-in `opencode.json`, uses the virtual
+  `local-marketplace` model, and receives OpenAI-compatible SSE responses.
+- OpenCode tool definitions and tool-result messages pass through the router.
+  Qwen2.5-Coder plain-JSON tool requests are promoted to structured tool calls
+  when they match a tool advertised by OpenCode.
 - If the router is unavailable, the dashboard uses its mock engine and retries
   the live WebSocket every five seconds.
 
@@ -57,7 +62,7 @@ OpenCode or Dashboard → FastAPI Router → Selected Ollama Mac → Router → 
 
 ## Verification completed
 
-- Eight backend integration tests pass.
+- Ten backend integration tests pass.
 - Tests cover round-robin routing, affinity, simultaneous requests, busy-state
   protection, second-endpoint selection, timeouts, connection loss, persistence,
   API authentication, deletion, registration validation, and dashboard events.
@@ -65,6 +70,8 @@ OpenCode or Dashboard → FastAPI Router → Selected Ollama Mac → Router → 
 - The optimized Next.js production build passes.
 - The FastAPI application starts in Uvicorn and serves `/health` and
   `/api/endpoints` successfully.
+- A real local request completed through FastAPI → Ollama/Qwen2.5-Coder.
+- A real OpenCode turn selected and executed its `read` tool through the router.
 
 Run the same checks with:
 
@@ -78,7 +85,7 @@ npm run build
 ## What the team should do next
 
 1. Put the router Mac and at least two supplier Macs on the same Wi-Fi.
-2. On each supplier, pull `tinyllama`, expose Ollama on `0.0.0.0:11434`, and
+2. On each supplier, pull `qwen2.5-coder`, expose Ollama on `0.0.0.0:11434`, and
    restart Ollama.
 3. Confirm the router can call each supplier's `/api/tags` URL.
 4. Start the router and dashboard using the root README.
@@ -90,8 +97,10 @@ npm run build
 
 ## Known MVP limitations
 
-- Non-streaming text completions only
-- No OpenCode tool calls or full coding-agent loop
+- Supplier inference is non-streaming; OpenCode receives the finished response
+  as a short SSE stream rather than token-by-token output.
+- Qwen2.5-Coder 7B can use OpenCode tools, but tool selection and final-answer
+  quality are model-dependent and less reliable than larger coding models.
 - One shared router API key
 - No user accounts, payments, queues, retries, or request-history persistence
 - Ollama endpoints have no API authentication and must stay off the public internet

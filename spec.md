@@ -8,7 +8,7 @@
 - **Router:** Python with FastAPI
 - **Dashboard:** Next.js
 - **Endpoint runtime:** Ollama
-- **Demo model:** `qwen2.5-coder:1.5b` (configurable)
+- **Demo model:** `qwen2.5-coder` (configurable)
 
 ### Current implementation status
 
@@ -17,6 +17,11 @@ routing, client affinity, concurrency protection, timeout/connection handling,
 dashboard APIs, and dashboard event WebSocket are implemented. The Next.js
 dashboard can register Ollama endpoints, use the real prompt route, and switch
 between live backend data and its offline mock fallback.
+
+OpenCode compatibility is implemented through an OpenAI-compatible SSE adapter.
+The router still holds each supplier reservation through a non-streaming Ollama
+completion, then emits the completed text or tool call as SSE frames. OpenCode
+tool definitions and tool-result messages are forwarded to the selected endpoint.
 
 The remaining environment-level milestone is the manual two-Mac Wi-Fi demo
 against real Ollama instances.
@@ -41,7 +46,7 @@ We will **not build a custom supplier agent or supplier WebSocket protocol**.
 
 Each supplier installs Ollama, downloads the configured model, and exposes Ollama's HTTP API to the local Wi-Fi. The router communicates directly with that API.
 
-The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It changes the public virtual model name (`local-marketplace`) to the real endpoint model (`qwen2.5-coder:1.5b`) before forwarding the request. It supports complete JSON responses and relayed streaming responses.
+The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It changes the public virtual model name (`local-marketplace`) to the real endpoint model (`qwen2.5-coder`) before forwarding the request.
 
 ## 4. System Diagram
 
@@ -53,7 +58,7 @@ The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It chang
 │          │  completions        │                 │  completions    │ Supplier Mac │
 │  User    ├────────────────────►│ Select endpoint ├────────────────►│ Qwen2.5 Code │
 │          │◄────────────────────┤ Track requests  │◄────────────────┤              │
-└──────────┘  SSE stream/JSON    └────────┬────────┘  SSE stream/JSON └──────────────┘
+└──────────┘  SSE stream/JSON    └────────┬────────┘  completed JSON └──────────────┘
                                          │
                                          │ live events (WebSocket)
                                          ▼
@@ -75,12 +80,12 @@ User/OpenCode → Router → Selected Ollama Endpoint → Router → User/OpenCo
 2. The router validates the API key and request.
 3. The router reuses the client's assigned endpoint or selects an available endpoint.
 4. The router marks that endpoint as busy and publishes dashboard events.
-5. The router copies the complete compatible request and replaces `model: local-marketplace` with `model: qwen2.5-coder:1.5b`.
-6. The router forwards the request to the endpoint's Ollama `/v1/chat/completions` API.
-7. For `stream: true`, the router relays Ollama's SSE chunks to OpenCode without rebuilding them.
-8. For `stream: false`, the router returns Ollama's completed JSON response.
-9. The router preserves tool calls so OpenCode can execute them on the user's computer.
-10. The router marks the endpoint as available when the response or stream ends, updates the dashboard, and returns the result.
+5. The router copies compatible request fields and replaces `model: local-marketplace` with the selected endpoint's configured model.
+6. The router forwards the request to the endpoint's Ollama `/v1/chat/completions` API with `stream: false`, including tools and supported generation options.
+7. Ollama runs the model and returns an OpenAI-compatible response.
+8. The router preserves structured tool calls and promotes Qwen's matching pure-JSON tool requests when necessary.
+9. The router changes the returned model name back to `local-marketplace`, releases the endpoint, and updates the dashboard.
+10. For `stream: true`, the router emits the completed response as OpenAI-compatible SSE frames; otherwise it returns JSON.
 
 OpenCode normally includes conversation history in the `messages` array, so the router does not need to store prompts, responses, or conversation history.
 
@@ -97,9 +102,10 @@ The router must:
 - Keep live busy states, request states, and client affinity in memory.
 - Select an available endpoint.
 - Enforce one active request per endpoint.
-- Forward complete OpenAI-compatible requests, including `messages`, `tools`, `tool_choice`, `stream`, and supported generation options.
-- Relay streaming SSE responses and return complete non-streaming JSON responses.
-- Keep an endpoint busy until its response finishes, its stream closes, or the request fails.
+- Forward non-streaming requests to Ollama and adapt completed responses to SSE
+  when the client requests streaming.
+- Forward OpenAI-compatible tool definitions, tool calls, and tool results.
+- Keep an endpoint busy until its Ollama response finishes or the request fails.
 - Return clear timeout, connection, and availability errors.
 - Publish live request and endpoint events to the dashboard through WebSocket.
 
@@ -119,7 +125,7 @@ Ollama provides:
 Supplier setup:
 
 ```bash
-ollama pull qwen2.5-coder:1.5b
+ollama pull qwen2.5-coder
 launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
 ```
 
@@ -152,7 +158,7 @@ SQLite stores only endpoint registration data:
 | `id` | Stable endpoint identifier |
 | `name` | Display name, such as `Omer's Mac` |
 | `base_url` | Ollama URL, such as `http://192.168.1.24:11434` |
-| `model_name` | Configured model, normally `qwen2.5-coder:1.5b` |
+| `model_name` | Configured model, normally `qwen2.5-coder` |
 | `created_at` | Registration time |
 | `last_seen_at` | Latest successful health check |
 
@@ -192,9 +198,10 @@ Authorization: Bearer <shared-api-key>
 }
 ```
 
-The router forwards nearly the same JSON to the selected endpoint after changing the model to `qwen2.5-coder:1.5b`. Compatible fields must be preserved rather than reconstructed from only `model` and `messages`.
-
-For a streaming request, the router returns `text/event-stream` and relays Ollama's chunks, including text deltas, tool-call deltas, finish reasons, usage data, and the final `[DONE]` marker. The dashboard simulator may use `stream: false` for simpler rendering.
+The router forwards nearly the same JSON to the selected endpoint after changing
+the model to `qwen2.5-coder` and forcing the supplier-side request to
+`stream: false`. If the client requested streaming, the router returns the
+completed Ollama response as OpenAI-compatible SSE frames.
 
 ### Supporting endpoints
 
@@ -213,6 +220,7 @@ Add an `opencode.json` file to the project using the router computer's local IP:
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "marketplace/local-marketplace",
+  "compaction": { "auto": false },
   "provider": {
     "marketplace": {
       "npm": "@ai-sdk/openai-compatible",
@@ -226,7 +234,7 @@ Add an `opencode.json` file to the project using the router computer's local IP:
           "name": "Local Marketplace",
           "limit": {
             "context": 32768,
-            "output": 2048
+            "output": 4096
           }
         }
       }
@@ -329,10 +337,10 @@ The MVP is complete when the team can demonstrate:
 1. Two Macs running Ollama can be registered in the router.
 2. The dashboard correctly shows online, busy, and offline states.
 3. OpenCode can call the router using the documented custom provider and `local-marketplace` model.
-4. The router selects an endpoint and progressively relays its streaming Ollama response to OpenCode.
+4. The router selects an endpoint and returns its completion to OpenCode as valid SSE.
 5. The router preserves a basic tool call, OpenCode executes it locally, and the follow-up request returns to the same endpoint.
 6. The dashboard visualizes the full request path.
 7. Its prompt simulator uses the same routing logic with a non-streaming request.
 8. Repeated requests from one client remain on the same endpoint during the demo.
-9. A completed, cancelled, or broken stream releases the endpoint's busy state.
+9. A completed or failed supplier request releases the endpoint's busy state.
 10. Busy, unavailable, disconnected, and timed-out endpoints produce clear errors.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -50,6 +51,9 @@ class FakeOllama:
                 raise httpx.ReadTimeout("slow", request=request)
             elif behavior == "disconnect":
                 raise httpx.ConnectError("gone", request=request)
+            content = f"answer from {host}"
+            if behavior == "text_tool":
+                content = '{"name":"read","arguments":{"filePath":"README.md"}}'
             return httpx.Response(
                 200,
                 json={
@@ -61,7 +65,7 @@ class FakeOllama:
                             "index": 0,
                             "message": {
                                 "role": "assistant",
-                                "content": f"answer from {host}",
+                                "content": content,
                             },
                             "finish_reason": "stop",
                         }
@@ -113,6 +117,88 @@ def test_round_robin_affinity_and_model_translation(tmp_path: Path) -> None:
         assert response_a1.json()["model"] == "local-marketplace"
         assert response_b.json()["marketplace"]["endpoint_id"] == second["id"]
         assert response_a2.json()["marketplace"]["endpoint_id"] == first["id"]
+
+
+def test_streaming_request_returns_openai_compatible_sse(tmp_path: Path) -> None:
+    ollama = FakeOllama()
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        endpoint = register(client, "Node A", "node-a")
+        response = client.post(
+            "/v1/chat/completions",
+            headers={"X-Client-ID": "opencode-client"},
+            json={
+                "model": "local-marketplace",
+                "messages": [
+                    {"role": "user", "content": "hello"},
+                    {
+                        "role": "tool",
+                        "content": "README heading",
+                        "tool_call_id": "call_readme",
+                    },
+                ],
+                "stream": True,
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "read",
+                            "parameters": {"type": "object"},
+                        },
+                    }
+                ],
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/event-stream")
+        frames = [line.removeprefix("data: ") for line in response.text.splitlines() if line]
+        assert frames[-1] == "[DONE]"
+        content = json.loads(frames[0])
+        finished = json.loads(frames[1])
+        assert content["object"] == "chat.completion.chunk"
+        assert content["choices"][0]["delta"]["content"] == "answer from node-a"
+        assert content["marketplace"]["endpoint_id"] == endpoint["id"]
+        assert finished["choices"][0]["finish_reason"] == "stop"
+        assert ollama.calls[0][1]["stream"] is False
+        assert ollama.calls[0][1]["tools"][0]["function"]["name"] == "read"
+        assert ollama.calls[0][1]["messages"][1]["role"] == "tool"
+        assert ollama.calls[0][1]["messages"][1]["tool_call_id"] == "call_readme"
+
+
+def test_qwen_text_tool_call_is_promoted_for_opencode(tmp_path: Path) -> None:
+    ollama = FakeOllama()
+    ollama.behavior["node-a"] = "text_tool"
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        register(client, "Node A", "node-a")
+        response = client.post(
+            "/v1/chat/completions",
+            json={
+                "model": "local-marketplace",
+                "messages": [{"role": "user", "content": "read README"}],
+                "stream": True,
+                "tools": [
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "read",
+                            "parameters": {"type": "object"},
+                        },
+                    }
+                ],
+            },
+        )
+
+        frames = [line.removeprefix("data: ") for line in response.text.splitlines() if line]
+        content = json.loads(frames[0])
+        finished = json.loads(frames[1])
+        tool_call = content["choices"][0]["delta"]["tool_calls"][0]
+        assert tool_call["function"]["name"] == "read"
+        assert json.loads(tool_call["function"]["arguments"]) == {
+            "filePath": "README.md"
+        }
+        assert finished["choices"][0]["finish_reason"] == "tool_calls"
 
 
 def test_concurrency_protection_and_busy_state(tmp_path: Path) -> None:

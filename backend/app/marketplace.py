@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
 from collections import deque
 from dataclasses import dataclass
@@ -162,7 +163,12 @@ class Marketplace:
         return deleted
 
     async def infer(
-        self, *, client_id: str, client_label: str, messages: list[dict[str, str]]
+        self,
+        *,
+        client_id: str,
+        client_label: str,
+        messages: list[dict[str, Any]],
+        upstream_options: dict[str, Any],
     ) -> InferenceResult:
         request_id = str(uuid.uuid4())
         await self.emit(
@@ -200,6 +206,7 @@ class Marketplace:
                 response = await self._client.post(
                     f"{state.record.base_url}/v1/chat/completions",
                     json={
+                        **upstream_options,
                         "model": state.record.model_name,
                         "messages": messages,
                         "stream": False,
@@ -224,14 +231,17 @@ class Marketplace:
                 )
             try:
                 payload = response.json()
-                content = payload["choices"][0]["message"]["content"]
+                message = payload["choices"][0]["message"]
+                self._promote_text_tool_call(payload, upstream_options)
+                content = message.get("content") or ""
+                tool_calls = message.get("tool_calls")
             except (ValueError, KeyError, IndexError, TypeError) as error:
                 raise EndpointInferenceError(
                     f"endpoint {state.record.name} returned a malformed completion"
                 ) from error
-            if not isinstance(content, str):
+            if not isinstance(content, str) or (not content and not tool_calls):
                 raise EndpointInferenceError(
-                    f"endpoint {state.record.name} returned non-text content"
+                    f"endpoint {state.record.name} returned no text or tool call"
                 )
 
             payload["id"] = f"chatcmpl-{request_id}"
@@ -271,6 +281,59 @@ class Marketplace:
                         endpoint_name=state.record.name,
                     )
                 await self.broadcast_snapshot()
+
+    @staticmethod
+    def _promote_text_tool_call(
+        payload: dict[str, Any], upstream_options: dict[str, Any]
+    ) -> None:
+        """Convert Qwen's plain JSON tool request into OpenAI tool_calls.
+
+        Some Ollama Qwen builds advertise tool support but return a pure
+        ``{"name": ..., "arguments": ...}`` object as assistant text. Only
+        promote it when the named function was explicitly advertised by the
+        caller, so normal JSON responses remain ordinary text.
+        """
+        tools = upstream_options.get("tools")
+        if not isinstance(tools, list) or not tools:
+            return
+        choice = payload["choices"][0]
+        message = choice["message"]
+        if message.get("tool_calls") or not isinstance(message.get("content"), str):
+            return
+        try:
+            candidate = json.loads(message["content"].strip())
+        except (json.JSONDecodeError, TypeError):
+            return
+        if not isinstance(candidate, dict):
+            return
+        name = candidate.get("name")
+        arguments = candidate.get("arguments", {})
+        allowed_names = {
+            tool.get("function", {}).get("name")
+            for tool in tools
+            if isinstance(tool, dict) and isinstance(tool.get("function"), dict)
+        }
+        if not isinstance(name, str) or name not in allowed_names:
+            return
+        if not isinstance(arguments, (dict, list, str)):
+            return
+        serialized_arguments = (
+            arguments
+            if isinstance(arguments, str)
+            else json.dumps(arguments, separators=(",", ":"))
+        )
+        message["content"] = ""
+        message["tool_calls"] = [
+            {
+                "id": f"call_{uuid.uuid4().hex}",
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "arguments": serialized_arguments,
+                },
+            }
+        ]
+        choice["finish_reason"] = "tool_calls"
 
     async def _reserve(self, client_id: str, request_id: str) -> EndpointState:
         async with self._lock:

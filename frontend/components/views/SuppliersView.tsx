@@ -20,7 +20,7 @@ export function SuppliersView({
   const [filter, setFilter] = useState<Filter>("all");
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
-  const [modelName, setModelName] = useState("tinyllama");
+  const [modelName, setModelName] = useState("qwen2.5-coder");
   const [registering, setRegistering] = useState(false);
   const [registrationError, setRegistrationError] = useState<string | null>(null);
 
@@ -68,7 +68,7 @@ export function SuppliersView({
         <div className="grid gap-2 md:grid-cols-[1fr_1.5fr_0.8fr_auto]">
           <input className="field" aria-label="Endpoint name" placeholder="Omer's Mac" value={name} onChange={(event) => setName(event.target.value)} />
           <input className="field" aria-label="Ollama base URL" placeholder="http://192.168.1.24:11434" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
-          <input className="field" aria-label="Ollama model" placeholder="tinyllama" value={modelName} onChange={(event) => setModelName(event.target.value)} />
+          <input className="field" aria-label="Ollama model" placeholder="qwen2.5-coder" value={modelName} onChange={(event) => setModelName(event.target.value)} />
           <button className="btn btn-primary" onClick={register} disabled={registering || !name.trim() || !baseUrl.trim() || !modelName.trim()}>
             {registering ? "Checking…" : "Register"}
           </button>

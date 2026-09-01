@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import hmac
+import json
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from .config import Settings
 from .database import EndpointRegistry
@@ -59,9 +61,16 @@ def create_app(
             raise HTTPException(status_code=401, detail="invalid API key")
 
     async def execute(
-        *, client_id: str, client_label: str, messages: list[dict[str, str]]
+        *,
+        client_id: str,
+        client_label: str,
+        messages: list[dict[str, Any]],
+        upstream_options: dict[str, Any] | None = None,
     ):
-        total_characters = sum(len(message["content"]) for message in messages)
+        total_characters = sum(
+            len(json.dumps(message.get("content"), ensure_ascii=False))
+            for message in messages
+        )
         if total_characters > resolved_settings.max_prompt_characters:
             raise HTTPException(status_code=413, detail="request body is too large")
         try:
@@ -69,6 +78,7 @@ def create_app(
                 client_id=client_id,
                 client_label=client_label,
                 messages=messages,
+                upstream_options=upstream_options or {},
             )
         except MarketplaceError as error:
             raise HTTPException(status_code=error.status_code, detail=str(error)) from error
@@ -113,13 +123,20 @@ def create_app(
         body: ChatCompletionRequest,
         request: Request,
         x_client_id: Annotated[str | None, Header(alias="X-Client-ID")] = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         fallback_id = request.client.host if request.client else "unknown-client"
         client_id = (x_client_id or fallback_id).strip()[:200]
+        request_payload = body.model_dump(exclude_none=True)
+        upstream_options = {
+            key: value
+            for key, value in request_payload.items()
+            if key not in {"model", "messages", "stream"}
+        }
         result = await execute(
             client_id=client_id,
             client_label=x_client_id or f"client-{fallback_id}",
-            messages=[message.model_dump() for message in body.messages],
+            messages=[message.model_dump(exclude_none=True) for message in body.messages],
+            upstream_options=upstream_options,
         )
         response = dict(result.response)
         response["marketplace"] = {
@@ -127,7 +144,62 @@ def create_app(
             "endpoint_id": result.endpoint_id,
             "endpoint_name": result.endpoint_name,
         }
-        return response
+        if not body.stream:
+            return response
+
+        async def event_stream():
+            choice = response["choices"][0]
+            message = choice["message"]
+            base_chunk = {
+                "id": response["id"],
+                "object": "chat.completion.chunk",
+                "created": response.get("created"),
+                "model": response["model"],
+                "marketplace": response["marketplace"],
+            }
+            delta = {"role": message.get("role", "assistant")}
+            if message.get("content"):
+                delta["content"] = message["content"]
+            if message.get("tool_calls"):
+                tool_calls = []
+                for index, raw_tool_call in enumerate(message["tool_calls"]):
+                    tool_call = dict(raw_tool_call)
+                    tool_call["index"] = index
+                    function = dict(tool_call.get("function", {}))
+                    arguments = function.get("arguments", "")
+                    if not isinstance(arguments, str):
+                        function["arguments"] = json.dumps(
+                            arguments, separators=(",", ":")
+                        )
+                    tool_call["function"] = function
+                    tool_calls.append(tool_call)
+                delta["tool_calls"] = tool_calls
+            content_chunk = {
+                **base_chunk,
+                "choices": [
+                    {
+                        "index": choice.get("index", 0),
+                        "delta": delta,
+                        "finish_reason": None,
+                    }
+                ],
+            }
+            finish_chunk = {
+                **base_chunk,
+                "choices": [
+                    {
+                        "index": choice.get("index", 0),
+                        "delta": {},
+                        "finish_reason": choice.get("finish_reason", "stop"),
+                    }
+                ],
+                "usage": response.get("usage"),
+            }
+            yield f"data: {json.dumps(content_chunk, separators=(',', ':'))}\n\n"
+            yield f"data: {json.dumps(finish_chunk, separators=(',', ':'))}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
 
     @app.get("/api/endpoints")
     async def endpoints() -> dict[str, Any]:

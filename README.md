@@ -17,6 +17,8 @@ Team members looking for a concise progress handoff should start with
 - Round-robin assignment for new clients and session affinity via `X-Client-ID`
 - Clear busy, unavailable, connection, model, and timeout errors
 - OpenAI-compatible `GET /v1/models` and `POST /v1/chat/completions`
+- OpenCode-compatible SSE responses backed by non-streaming Ollama inference
+- OpenAI tool definition/message forwarding, including a Qwen JSON tool-call shim
 - Endpoint registration, prompt simulation, and live dashboard WebSocket APIs
 - Live dashboard integration with automatic offline mock fallback and reconnect
 
@@ -41,7 +43,7 @@ affinity, active requests, and event history remain in memory.
 ## Prepare each Ollama Mac
 
 ```bash
-ollama pull tinyllama
+ollama pull qwen2.5-coder
 launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
 ```
 
@@ -120,9 +122,18 @@ Create `opencode.json` in the project OpenCode will operate on:
 }
 ```
 
-The current POC supports non-streaming text completions, not tool calls. OpenCode
-therefore demonstrates provider compatibility and routed prompting rather than
-a complete file-editing agent loop.
+The checked-in `opencode.json` already points OpenCode Desktop at the local
+router, selects `marketplace/local-marketplace`, and declares Qwen2.5-Coder's
+32K context window. Open the repository as a project in OpenCode and choose
+`Local Marketplace` if it is not selected automatically.
+
+OpenCode requests streaming responses, while the router deliberately keeps the
+supplier reservation until a non-streaming Ollama completion finishes. The
+router then returns that completion as a short OpenAI-compatible SSE stream.
+Tool definitions, assistant tool calls, and tool-result messages are forwarded.
+Ollama's current Qwen2.5-Coder build sometimes returns a pure JSON tool request
+as text; the router promotes it to `tool_calls` only when its function name
+matches a tool OpenCode advertised.
 
 ## Verification
 
@@ -133,4 +144,5 @@ cd frontend && npm run typecheck && npm run build
 
 The backend integration tests cover round-robin routing, affinity, atomic busy
 state, concurrency rejection, timeouts, connection loss, persistence, endpoint
-validation, API authentication, deletion, and dashboard event delivery.
+validation, API authentication, deletion, dashboard event delivery, SSE output,
+tool forwarding, and Qwen tool-call promotion.

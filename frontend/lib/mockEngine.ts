@@ -32,10 +32,10 @@ const nowIso = () => new Date().toISOString();
 function initialSuppliers(): Supplier[] {
   const t = Date.now();
   return [
-    { id: "team-mac-1", name: "team-mac-1", baseUrl: "http://192.168.1.21:11434", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
-    { id: "team-mac-2", name: "team-mac-2", baseUrl: "http://192.168.1.22:11434", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
-    { id: "team-mac-3", name: "team-mac-3", baseUrl: "http://192.168.1.23:11434", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
-    { id: "studio-mac", name: "studio-mac", baseUrl: "http://192.168.1.24:11434", model: "tinyllama", status: "offline", activeRequests: 0, lastSeen: new Date(t - 1000 * 60 * 4).toISOString() },
+    { id: "team-mac-1", name: "team-mac-1", baseUrl: "http://192.168.1.21:11434", model: "qwen2.5-coder", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
+    { id: "team-mac-2", name: "team-mac-2", baseUrl: "http://192.168.1.22:11434", model: "qwen2.5-coder", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
+    { id: "team-mac-3", name: "team-mac-3", baseUrl: "http://192.168.1.23:11434", model: "qwen2.5-coder", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
+    { id: "studio-mac", name: "studio-mac", baseUrl: "http://192.168.1.24:11434", model: "qwen2.5-coder", status: "offline", activeRequests: 0, lastSeen: new Date(t - 1000 * 60 * 4).toISOString() },
   ];
 }
 
@@ -43,14 +43,14 @@ const CANNED: Record<string, string> = {
   recursion:
     "Recursion is when a function calls itself to solve a smaller piece of the same problem, stopping at a simple base case. Think of nested boxes: you open one, find a smaller one inside, and repeat until a box is empty.",
   default:
-    "Here's a short answer from the local model running on this Ollama endpoint. In a real deployment TinyLlama generates this text on the endpoint Mac and returns it through the central router.",
+    "Here's a short answer from the local model running on this Ollama endpoint. In a real deployment Qwen2.5-Coder generates this text on the endpoint Mac and returns it through the central router.",
 };
 
 function fakeAnswer(prompt: string): string {
   const p = prompt.toLowerCase();
   if (p.includes("recursion")) return CANNED.recursion;
   if (p.includes("hello") || p.includes("hi ") || p.trim() === "hi")
-    return "Hello! I'm TinyLlama running locally on this Ollama endpoint. Ask me anything and the marketplace will route it here.";
+    return "Hello! I'm Qwen2.5-Coder running locally on this Ollama endpoint. Ask me anything and the marketplace will route it here.";
   const trimmed = prompt.trim().replace(/\s+/g, " ");
   const topic = trimmed.length > 60 ? trimmed.slice(0, 57) + "…" : trimmed;
   return `On "${topic}" — ${CANNED.default}`;
