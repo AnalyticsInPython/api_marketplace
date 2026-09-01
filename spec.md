@@ -4,6 +4,7 @@
 
 - **Status:** Initial implementation specification
 - **Project type:** Educational proof of concept (POC)
+- **Collaborators:** Omer Abraham, Alara Dinc, Austin Chandra, David Lee
 - **Target environment:** Multiple macOS computers connected to the same local Wi-Fi network
 - **Primary language:** Python
 - **Frontend:** Next.js
