@@ -5,7 +5,7 @@ import type { DashboardEvent } from "@/lib/types";
 import { EventLogTable } from "@/components/EventLogTable";
 import { IconSearch } from "@/components/icons";
 
-type Filter = "all" | "supplier" | "request";
+type Filter = "all" | "endpoint" | "request";
 
 export function EventsView({ events }: { events: DashboardEvent[] }) {
   const [query, setQuery] = useState("");
@@ -14,7 +14,7 @@ export function EventsView({ events }: { events: DashboardEvent[] }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return events.filter((e) => {
-      if (filter === "supplier" && !e.event.startsWith("supplier.")) return false;
+      if (filter === "endpoint" && !e.event.startsWith("endpoint.") && !e.event.startsWith("supplier.")) return false;
       if (filter === "request" && !e.event.startsWith("request.")) return false;
       if (q) {
         const hay = `${e.event} ${e.supplierName ?? ""} ${e.clientLabel ?? ""} ${e.requestId ?? ""} ${e.message ?? ""}`.toLowerCase();
@@ -26,7 +26,7 @@ export function EventsView({ events }: { events: DashboardEvent[] }) {
 
   const opts: { label: string; value: Filter }[] = [
     { label: "All", value: "all" },
-    { label: "Suppliers", value: "supplier" },
+    { label: "Endpoints", value: "endpoint" },
     { label: "Requests", value: "request" },
   ];
 

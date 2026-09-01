@@ -10,12 +10,32 @@ type Filter = "all" | SupplierStatus;
 export function SuppliersView({
   suppliers,
   activeSupplierId,
+  onRegister,
 }: {
   suppliers: Supplier[];
   activeSupplierId?: string;
+  onRegister: (name: string, baseUrl: string, modelName: string) => Promise<string | null>;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [name, setName] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [modelName, setModelName] = useState("tinyllama");
+  const [registering, setRegistering] = useState(false);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
+
+  const register = async () => {
+    if (!name.trim() || !baseUrl.trim() || !modelName.trim() || registering) return;
+    setRegistering(true);
+    setRegistrationError(null);
+    const error = await onRegister(name.trim(), baseUrl.trim(), modelName.trim());
+    setRegistering(false);
+    setRegistrationError(error);
+    if (!error) {
+      setName("");
+      setBaseUrl("");
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -36,20 +56,33 @@ export function SuppliersView({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-[19px] font-semibold text-ink">Supplier nodes</h1>
+        <h1 className="text-[19px] font-semibold text-ink">Ollama endpoints</h1>
         <p className="mt-1 text-[13px] text-muted">
-          Every Mac that connected a supplier agent to the central server. Status and load are live;
-          the registry persists across restarts.
+          Register each Mac&apos;s Ollama URL. The router validates the model, polls health, and persists
+          the endpoint registry across restarts.
         </p>
       </div>
+
+      <section className="panel px-5 py-4">
+        <div className="eyebrow mb-3">Register endpoint</div>
+        <div className="grid gap-2 md:grid-cols-[1fr_1.5fr_0.8fr_auto]">
+          <input className="field" aria-label="Endpoint name" placeholder="Omer's Mac" value={name} onChange={(event) => setName(event.target.value)} />
+          <input className="field" aria-label="Ollama base URL" placeholder="http://192.168.1.24:11434" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+          <input className="field" aria-label="Ollama model" placeholder="tinyllama" value={modelName} onChange={(event) => setModelName(event.target.value)} />
+          <button className="btn btn-primary" onClick={register} disabled={registering || !name.trim() || !baseUrl.trim() || !modelName.trim()}>
+            {registering ? "Checking…" : "Register"}
+          </button>
+        </div>
+        {registrationError ? <p className="mt-2 text-[12px]" style={{ color: "var(--error)" }}>{registrationError}</p> : null}
+      </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <div className="input min-w-[190px] flex-1 sm:max-w-[280px]">
             <IconSearch size={15} />
-            <input aria-label="Search supplier nodes" placeholder="Search by node or model…" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input aria-label="Search endpoints" placeholder="Search by endpoint or model…" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
-          <div className="seg scroll-thin max-w-full overflow-x-auto" role="group" aria-label="Filter suppliers by status">
+          <div className="seg scroll-thin max-w-full overflow-x-auto" role="group" aria-label="Filter endpoints by status">
             {opts.map((o) => (
               <button key={o.value} className={`seg-btn ${filter === o.value ? "active" : ""}`} onClick={() => setFilter(o.value)} aria-pressed={filter === o.value}>
                 {o.label}

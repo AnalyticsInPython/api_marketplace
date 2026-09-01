@@ -101,12 +101,12 @@ export function OverviewView({
         </div>
       </section>
 
-      {/* Suppliers table */}
+      {/* Ollama endpoints table */}
       <section>
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="input w-[260px] max-w-full">
             <IconSearch size={15} />
-            <input aria-label="Search suppliers" placeholder="Search suppliers…" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input aria-label="Search endpoints" placeholder="Search endpoints…" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <span className="text-[12px] text-muted">
             {filtered.length} node{filtered.length === 1 ? "" : "s"}

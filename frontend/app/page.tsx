@@ -82,7 +82,11 @@ export default function Console() {
               />
             )}
             {view === "suppliers" && (
-              <SuppliersView suppliers={dash.suppliers} activeSupplierId={activeSupplierId} />
+              <SuppliersView
+                suppliers={dash.suppliers}
+                activeSupplierId={activeSupplierId}
+                onRegister={dash.registerEndpoint}
+              />
             )}
             {view === "playground" && (
               <PlaygroundView

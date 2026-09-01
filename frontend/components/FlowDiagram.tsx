@@ -117,13 +117,13 @@ export function FlowDiagram({ request }: { request: ActiveRequest }) {
         <Connector state={l1} />
         <Node icon={<IconServer />} label="Central Server" sub="FastAPI router" lit={serverLit(stage)} />
         <Connector state={l2} />
-        <Node icon={<IconSupplier />} label="Supplier" sub={request.supplierName || "least-busy node"} lit={supplierLit(stage)} error={failed} />
+        <Node icon={<IconSupplier />} label="Ollama endpoint" sub={request.supplierName || "round-robin selection"} lit={supplierLit(stage)} error={failed} />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-x-8 gap-y-2 border-t border-line pt-4 text-[12px]">
         <Meta label="Request"><span className="font-mono text-muted">{request.id ?? "—"}</span></Meta>
         <Meta label="Client"><span className="text-muted">{request.clientLabel}</span></Meta>
-        <Meta label="Supplier"><span className="text-muted">{request.supplierName ?? "—"}</span></Meta>
+        <Meta label="Endpoint"><span className="text-muted">{request.supplierName ?? "—"}</span></Meta>
       </div>
     </section>
   );

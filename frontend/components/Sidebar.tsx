@@ -31,7 +31,7 @@ const GROUPS: { label?: string; items: Item[] }[] = [
     label: "Marketplace",
     items: [
       { id: "playground", label: "Playground", icon: IconPlay },
-      { id: "suppliers", label: "Suppliers", icon: IconSuppliers },
+      { id: "suppliers", label: "Endpoints", icon: IconSuppliers },
       { id: "events", label: "Event log", icon: IconEvents },
     ],
   },

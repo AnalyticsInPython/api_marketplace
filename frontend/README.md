@@ -10,8 +10,8 @@ restrained status colors (sage / amber / gray).
 
 On load the console tries to connect to the central server's dashboard
 WebSocket. If none is reachable within ~2.5s it **transparently falls back to a
-built-in mock engine** that simulates the whole lifecycle — supplier selection
-(least-busy + round-robin), client affinity, one-request-per-supplier, and
+built-in mock engine** that simulates the whole lifecycle — endpoint selection
+(round-robin), client affinity, one-request-per-endpoint, and
 availability errors — and seeds the activity chart with synthetic history so it
 looks alive immediately. So you can `npm run dev` and click through a fully live
 console today, before the backend exists.
@@ -35,11 +35,11 @@ Open http://localhost:3000.
 - **Overview** — stat tiles, the live **Network activity** chart (active-request
   load as a stepped crimson line + request latency, with `Active / Latency / Both`
   and `5m / 15m / 1h` toggles and a hover callout), and the suppliers table.
-- **Suppliers** — full node table (checkboxes, node, model, host, status, load,
-  last seen) with search + status filter. (§8.3, §15)
+- **Endpoints** — Ollama registration form plus the full node table (node, URL,
+  model, status, load, last seen) with search + status filtering.
 - **Playground** — a **full-width Send-a-prompt** bar that routes through the same
   service as `/v1/chat/completions`, plus the full-width **Live routing** diagram
-  (`Client → Central Server → Supplier → back`, active hop animated) and a live
+  (`Client → Central Server → Ollama endpoint → back`, active hop animated) and a live
   event tail. (§6, §10.4, §15)
 - **Event log** — session-only, timestamped event table with filters. (§12, §15)
 - **API keys** — base URL, WebSocket, model, shared key, and an OpenCode snippet. (§10.1)
@@ -52,19 +52,20 @@ All settings are env vars (see `.env.example`):
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `NEXT_PUBLIC_API_BASE_URL` | FastAPI base URL (`/api/suppliers`, `/api/simulate`) | `http://localhost:8000` |
+| `NEXT_PUBLIC_API_BASE_URL` | FastAPI base URL (`/api/endpoints`, `/api/prompts`) | `http://localhost:8000` |
 | `NEXT_PUBLIC_WS_URL` | Dashboard events WebSocket (`WS /ws/dashboard`) | `ws://localhost:8000/ws/dashboard` |
 | `NEXT_PUBLIC_API_KEY` | Shared bearer token, if the dashboard endpoints require it | _(empty)_ |
 | `NEXT_PUBLIC_USE_MOCK` | Force the mock engine even when a backend is reachable | `false` |
 
 ### Expected backend payloads
 
-- `GET /api/suppliers` → an array (or `{ suppliers: [...] }`) of
-  `{ id, name, model_name, status, active_requests, last_seen_at }`.
+- `GET /api/endpoints` → `{ suppliers: [...] }` containing
+  `{ id, name, base_url, model_name, status, active_requests, last_seen_at }`.
+- `POST /api/endpoints` → validates and persists `{ name, base_url, model_name }`.
 - `WS /ws/dashboard` → JSON events per spec §12
-  (`{ event, timestamp, request_id, client_label, supplier_id, supplier_name }`),
+  (`{ event, timestamp, request_id, client_label, endpoint_id, endpoint_name }`),
   and optionally a `{ suppliers: [...] }` snapshot message.
-- `POST /api/simulate` → `{ prompt, client_label }`, returning the completion
+- `POST /api/prompts` → `{ prompt, client_label }`, returning the completion
   (`content` / `response` / OpenAI-style `choices[0].message.content`).
 
 Field names are normalized permissively (snake_case and camelCase both work).

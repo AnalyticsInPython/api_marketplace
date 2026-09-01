@@ -2,7 +2,7 @@
    Mock engine
    Drives the entire request lifecycle client-side so the dashboard is fully
    alive without a running FastAPI backend. It mirrors the real routing rules:
-     - one active request per supplier (spec §8.1)
+     - one active request per Ollama endpoint
      - least-busy + round-robin selection (spec §9.4)
      - client affinity for the session (spec §9.3)
      - immediate availability error when nothing is online (spec §9.5)
@@ -32,10 +32,10 @@ const nowIso = () => new Date().toISOString();
 function initialSuppliers(): Supplier[] {
   const t = Date.now();
   return [
-    { id: "team-mac-1", name: "team-mac-1", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
-    { id: "team-mac-2", name: "team-mac-2", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
-    { id: "team-mac-3", name: "team-mac-3", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
-    { id: "studio-mac", name: "studio-mac", model: "tinyllama", status: "offline", activeRequests: 0, lastSeen: new Date(t - 1000 * 60 * 4).toISOString() },
+    { id: "team-mac-1", name: "team-mac-1", baseUrl: "http://192.168.1.21:11434", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
+    { id: "team-mac-2", name: "team-mac-2", baseUrl: "http://192.168.1.22:11434", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
+    { id: "team-mac-3", name: "team-mac-3", baseUrl: "http://192.168.1.23:11434", model: "tinyllama", status: "online", activeRequests: 0, lastSeen: new Date(t).toISOString() },
+    { id: "studio-mac", name: "studio-mac", baseUrl: "http://192.168.1.24:11434", model: "tinyllama", status: "offline", activeRequests: 0, lastSeen: new Date(t - 1000 * 60 * 4).toISOString() },
   ];
 }
 
@@ -43,14 +43,14 @@ const CANNED: Record<string, string> = {
   recursion:
     "Recursion is when a function calls itself to solve a smaller piece of the same problem, stopping at a simple base case. Think of nested boxes: you open one, find a smaller one inside, and repeat until a box is empty.",
   default:
-    "Here's a short answer from the local model running on this supplier node. In a real deployment TinyLlama generates this text on the supplier's own Mac and streams it back through the central server.",
+    "Here's a short answer from the local model running on this Ollama endpoint. In a real deployment TinyLlama generates this text on the endpoint Mac and returns it through the central router.",
 };
 
 function fakeAnswer(prompt: string): string {
   const p = prompt.toLowerCase();
   if (p.includes("recursion")) return CANNED.recursion;
   if (p.includes("hello") || p.includes("hi ") || p.trim() === "hi")
-    return "Hello! I'm TinyLlama running locally on this supplier node. Ask me anything and the marketplace will route it here.";
+    return "Hello! I'm TinyLlama running locally on this Ollama endpoint. Ask me anything and the marketplace will route it here.";
   const trimmed = prompt.trim().replace(/\s+/g, " ");
   const topic = trimmed.length > 60 ? trimmed.slice(0, 57) + "…" : trimmed;
   return `On "${topic}" — ${CANNED.default}`;
@@ -75,7 +75,7 @@ export class MockEngine {
     this.emitSuppliers();
     // Seed the feed so a freshly opened dashboard shows recent state.
     for (const s of this.suppliers) {
-      this.emit(s.status === "offline" ? "supplier.offline" : "supplier.online", {
+      this.emit(s.status === "offline" ? "endpoint.offline" : "endpoint.online", {
         supplierId: s.id,
         supplierName: s.name,
         message: `${s.name} · ${s.model}`,
@@ -181,19 +181,19 @@ export class MockEngine {
           ...base,
           status: "failed",
           stage: "failed",
-          error: "No supplier available. All nodes are offline or busy.",
+          error: "No endpoint available. All nodes are offline or busy.",
         });
         this.emit("request.failed", {
           requestId,
           clientLabel,
-          message: "503 — no eligible supplier",
+          message: "503 — no eligible endpoint",
         });
         return;
       }
 
       this.inFlight.add(clientLabel);
       this.setSupplier(supplier.id, { status: "busy", activeRequests: 1 });
-      this.emit("supplier.busy", {
+      this.emit("endpoint.busy", {
         supplierId: supplier.id,
         supplierName: supplier.name,
         requestId,
@@ -240,7 +240,7 @@ export class MockEngine {
           });
           this.inFlight.delete(clientLabel);
           this.setSupplier(supplier.id, { status: "online", activeRequests: 0 });
-          this.emit("supplier.online", {
+          this.emit("endpoint.online", {
             supplierId: supplier.id,
             supplierName: supplier.name,
           });

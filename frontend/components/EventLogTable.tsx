@@ -12,7 +12,7 @@ export function EventLogTable({ events }: { events: DashboardEvent[] }) {
               <th style={{ width: 96 }}>Time</th>
               <th>Event</th>
               <th>Request</th>
-              <th>Supplier</th>
+              <th>Endpoint</th>
               <th>Detail</th>
             </tr>
           </thead>

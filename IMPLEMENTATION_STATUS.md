@@ -1,0 +1,99 @@
+# Implementation Status — September 1, 2026
+
+This document is the short handoff for the team. The detailed product contract
+is in [`spec.md`](spec.md), and complete setup commands are in
+[`README.md`](README.md).
+
+## What now works
+
+### Router and marketplace behavior
+
+- FastAPI exposes one public model, `local-marketplace`.
+- Ollama Macs are registered by display name, base URL, and installed model.
+- Registrations persist in SQLite across router restarts.
+- The router polls each endpoint's `/api/tags` route and derives
+  `online`, `busy`, or `offline` state.
+- New clients are distributed between online endpoints with round-robin routing.
+- A client's `X-Client-ID` remains pinned to the same endpoint for the current
+  router session.
+- Selection and busy-state reservation are atomic, so two requests cannot be
+  assigned to the same endpoint simultaneously.
+- An endpoint handles one marketplace request at a time. There is no queue and
+  no automatic retry on another endpoint.
+- Timeouts and connection failures return clear HTTP errors and mark the affected
+  endpoint offline until a later health check succeeds.
+
+### API and dashboard
+
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+- `GET`, `POST /api/endpoints`
+- `DELETE /api/endpoints/{id}`
+- `POST /api/prompts`
+- `WS /ws/dashboard`
+- Backward-compatible aliases: `GET /api/suppliers` and `POST /api/simulate`
+- The dashboard can register and validate an Ollama endpoint.
+- Supplier tables now show the actual Ollama base URL.
+- Endpoint and request events update status, charts, routing visualization, and
+  the event log live.
+- If the router is unavailable, the dashboard uses its mock engine and retries
+  the live WebSocket every five seconds.
+
+## Architecture decision to know
+
+There is no custom supplier agent. Each supplier Mac runs Ollama directly and
+exposes port `11434` only to the trusted local Wi-Fi. The FastAPI router calls:
+
+```text
+GET  http://<supplier-ip>:11434/api/tags
+POST http://<supplier-ip>:11434/v1/chat/completions
+```
+
+The request path is:
+
+```text
+OpenCode or Dashboard → FastAPI Router → Selected Ollama Mac → Router → Client
+```
+
+## Verification completed
+
+- Eight backend integration tests pass.
+- Tests cover round-robin routing, affinity, simultaneous requests, busy-state
+  protection, second-endpoint selection, timeouts, connection loss, persistence,
+  API authentication, deletion, registration validation, and dashboard events.
+- The Next.js TypeScript check passes.
+- The optimized Next.js production build passes.
+- The FastAPI application starts in Uvicorn and serves `/health` and
+  `/api/endpoints` successfully.
+
+Run the same checks with:
+
+```bash
+.venv/bin/python -m pytest
+cd frontend
+npm run typecheck
+npm run build
+```
+
+## What the team should do next
+
+1. Put the router Mac and at least two supplier Macs on the same Wi-Fi.
+2. On each supplier, pull `tinyllama`, expose Ollama on `0.0.0.0:11434`, and
+   restart Ollama.
+3. Confirm the router can call each supplier's `/api/tags` URL.
+4. Start the router and dashboard using the root README.
+5. Register both Ollama URLs from the dashboard Endpoints view.
+6. Send requests with two different `X-Client-ID` values and confirm round-robin
+   assignment; repeat one ID and confirm affinity.
+7. Exercise offline, busy, disconnect, and timeout scenarios from the acceptance
+   criteria in `spec.md`.
+
+## Known MVP limitations
+
+- Non-streaming text completions only
+- No OpenCode tool calls or full coding-agent loop
+- One shared router API key
+- No user accounts, payments, queues, retries, or request-history persistence
+- Ollama endpoints have no API authentication and must stay off the public internet
+- Live busy state, affinity, active requests, and event history reset when the
+  router restarts

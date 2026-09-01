@@ -10,6 +10,17 @@
 - **Endpoint runtime:** Ollama
 - **Demo model:** `tinyllama` (configurable)
 
+### Current implementation status
+
+The FastAPI router, SQLite endpoint registry, health polling, multi-endpoint
+routing, client affinity, concurrency protection, timeout/connection handling,
+dashboard APIs, and dashboard event WebSocket are implemented. The Next.js
+dashboard can register Ollama endpoints, use the real prompt route, and switch
+between live backend data and its offline mock fallback.
+
+The remaining environment-level milestone is the manual two-Mac Wi-Fi demo
+against real Ollama instances.
+
 The system routes LLM requests from OpenCode or a web dashboard to available team computers running local models. The main project work is the central API/router and its visualization. Ollama provides model installation, inference, and the HTTP server on every endpoint computer.
 
 ## 2. MVP Goals
@@ -194,7 +205,8 @@ The router forwards nearly the same JSON to the selected endpoint after changing
 - A new client is assigned to an available endpoint.
 - If several endpoints are available, the router uses round-robin selection.
 - Repeated requests from the same client use the same endpoint during the current router session.
-- The exact lightweight client identifier may be chosen during implementation.
+- The implementation uses `X-Client-ID` when supplied and falls back to the
+  client's IP address. The dashboard uses its stable `client_label`.
 - If the assigned endpoint is busy, offline, or fails, the router returns an error.
 - The MVP does not queue requests or retry them on another endpoint.
 
@@ -274,4 +286,3 @@ The MVP is complete when the team can demonstrate:
 6. Its prompt simulator uses the same routing logic as OpenCode.
 7. Repeated requests from one client remain on the same endpoint during the demo.
 8. Busy, unavailable, disconnected, and timed-out endpoints produce clear errors.
-

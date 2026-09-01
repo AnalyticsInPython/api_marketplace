@@ -47,7 +47,7 @@ export function SuppliersTable({
             {suppliers.length === 0 ? (
               <tr>
                 <td colSpan={7} className="muted" style={{ textAlign: "center", padding: "34px" }}>
-                  No suppliers match. Start a supplier agent to register a node.
+                  No endpoints match. Register a Mac running Ollama to begin.
                 </td>
               </tr>
             ) : (
@@ -78,7 +78,7 @@ export function SuppliersTable({
                         <span className="text-online">
                           <IconPin size={13} />
                         </span>
-                        {s.name}.local
+                        {s.baseUrl || "—"}
                       </span>
                     </td>
                     <td>

@@ -38,6 +38,7 @@ function normalizeSupplier(raw: any): Supplier {
   return {
     id: String(raw.id ?? raw.supplier_id ?? raw.name),
     name: String(raw.name ?? raw.supplier_name ?? raw.id),
+    baseUrl: String(raw.base_url ?? raw.baseUrl ?? ""),
     model: String(raw.model ?? raw.model_name ?? "tinyllama"),
     status: ["online", "busy", "offline"].includes(status) ? status : "offline",
     activeRequests: Number(raw.active_requests ?? raw.activeRequests ?? 0),
@@ -53,8 +54,8 @@ function normalizeEvent(raw: any): DashboardEvent {
     timestamp: raw.timestamp ?? new Date().toISOString(),
     requestId: raw.request_id ?? raw.requestId,
     clientLabel: raw.client_label ?? raw.clientLabel,
-    supplierId: raw.supplier_id ?? raw.supplierId,
-    supplierName: raw.supplier_name ?? raw.supplierName,
+    supplierId: raw.supplier_id ?? raw.supplierId ?? raw.endpoint_id ?? raw.endpointId,
+    supplierName: raw.supplier_name ?? raw.supplierName ?? raw.endpoint_name ?? raw.endpointName,
     message: raw.message,
   };
 }
@@ -162,6 +163,7 @@ export function useDashboard() {
   useEffect(() => {
     let disposed = false;
     let connectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const seedIfMock = () => {
       if (seededRef.current) return;
@@ -172,7 +174,7 @@ export function useDashboard() {
     };
 
     const startMock = () => {
-      if (disposed) return;
+      if (disposed || engineRef.current) return;
       const engine = new MockEngine({
         onSuppliers: (s) => !disposed && setSuppliers(s),
         onEvent: (e) => !disposed && ingestEvent(e),
@@ -184,9 +186,14 @@ export function useDashboard() {
       seedIfMock();
     };
 
+    const stopMock = () => {
+      engineRef.current?.stop();
+      engineRef.current = null;
+    };
+
     const fetchSuppliers = async () => {
       try {
-        const res = await fetch(`${config.apiBaseUrl}/api/suppliers`, {
+        const res = await fetch(`${config.apiBaseUrl}/api/endpoints`, {
           headers: config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {},
         });
         if (!res.ok) return;
@@ -198,12 +205,22 @@ export function useDashboard() {
       }
     };
 
+    const scheduleReconnect = () => {
+      if (disposed || config.forceMock || reconnectTimer) return;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        tryLive();
+      }, 5000);
+    };
+
     const tryLive = () => {
+      if (disposed) return;
       let ws: WebSocket;
       try {
         ws = new WebSocket(config.wsUrl);
       } catch {
         startMock();
+        scheduleReconnect();
         return;
       }
       wsRef.current = ws;
@@ -220,8 +237,20 @@ export function useDashboard() {
       }, config.liveConnectTimeoutMs);
 
       ws.onopen = () => {
-        if (disposed) return;
+        if (disposed || wsRef.current !== ws) return;
         if (connectTimer) clearTimeout(connectTimer);
+        connectTimer = null;
+        const wasMock = modeRef.current === "mock";
+        stopMock();
+        if (wasMock) {
+          setSuppliers([]);
+          setEvents([]);
+          setRequest(IDLE_REQUEST);
+          setStats({ completed: 0, failed: 0, latencies: [] });
+          setSeries([]);
+          setCompletions([]);
+          seededRef.current = false;
+        }
         setModeBoth("live");
         void fetchSuppliers();
       };
@@ -241,7 +270,7 @@ export function useDashboard() {
         if (payload?.event) {
           const e = normalizeEvent(payload);
           ingestEvent(e);
-          if (e.event.startsWith("supplier.")) void fetchSuppliers();
+          if (e.event.startsWith("supplier.") || e.event.startsWith("endpoint.")) void fetchSuppliers();
           if (e.event.startsWith("request.")) {
             setRequest((prev) => ({
               ...prev,
@@ -259,22 +288,28 @@ export function useDashboard() {
               stage: stageForEvent(e.event),
               supplierName: e.supplierName ?? prev.supplierName,
               supplierId: e.supplierId ?? prev.supplierId,
+              error: e.event === "request.failed" ? e.message ?? "Request failed" : prev.error,
             }));
           }
         }
       };
 
       ws.onerror = () => {
+        if (wsRef.current !== ws) return;
         if (modeRef.current !== "live" && !disposed) {
           if (connectTimer) clearTimeout(connectTimer);
+          connectTimer = null;
           startMock();
+          scheduleReconnect();
         }
       };
       ws.onclose = () => {
-        if (modeRef.current !== "live" && !disposed) {
-          if (connectTimer) clearTimeout(connectTimer);
-          startMock();
-        }
+        if (disposed || wsRef.current !== ws) return;
+        wsRef.current = null;
+        if (connectTimer) clearTimeout(connectTimer);
+        connectTimer = null;
+        startMock();
+        scheduleReconnect();
       };
     };
 
@@ -284,6 +319,7 @@ export function useDashboard() {
     return () => {
       disposed = true;
       if (connectTimer) clearTimeout(connectTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       engineRef.current?.stop();
       engineRef.current = null;
       try {
@@ -326,7 +362,7 @@ export function useDashboard() {
         stage: "toServer",
       });
       try {
-        const res = await fetch(`${config.apiBaseUrl}/api/simulate`, {
+        const res = await fetch(`${config.apiBaseUrl}/api/prompts`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -369,6 +405,34 @@ export function useDashboard() {
     }
   }, []);
 
+  const registerEndpoint = useCallback(async (
+    name: string,
+    baseUrl: string,
+    modelName: string,
+  ): Promise<string | null> => {
+    if (modeRef.current !== "live") return "Connect to the live router before registering an endpoint.";
+    try {
+      const res = await fetch(`${config.apiBaseUrl}/api/endpoints`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+        },
+        body: JSON.stringify({ name, base_url: baseUrl, model_name: modelName }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return data?.detail ?? `Registration failed (${res.status})`;
+      const endpoint = normalizeSupplier(data);
+      setSuppliers((current) => [
+        ...current.filter((item) => item.id !== endpoint.id),
+        endpoint,
+      ]);
+      return null;
+    } catch {
+      return "Could not reach the central server.";
+    }
+  }, []);
+
   /* ------------------------------ metrics -------------------------------- */
 
   const metrics: DashboardMetrics = useMemo(() => {
@@ -401,6 +465,7 @@ export function useDashboard() {
     series,
     completions,
     submitPrompt,
+    registerEndpoint,
     busy,
   };
 }

@@ -6,7 +6,7 @@ import { IconFolder, IconChevronDown, IconMenu, IconPlus } from "./icons";
 
 const TITLES: Record<View, string> = {
   overview: "Overview",
-  suppliers: "Suppliers",
+  suppliers: "Endpoints",
   playground: "Playground",
   events: "Event log",
   apikeys: "API keys",

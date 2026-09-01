@@ -29,16 +29,24 @@ export function DocsView() {
       </div>
 
       <Section title="REST endpoints">
-        The console reads the supplier registry and submits simulated prompts through the same routing
+        The console reads the endpoint registry and submits prompts through the same routing
         service as the OpenAI-compatible API.
-        <Code>{`GET  /api/suppliers      # registry + live states
-POST /api/simulate       # { prompt, client_label } -> completion
-GET  /health             # server health
+        <Code>{`GET    /api/endpoints       # registry + live states
+POST   /api/endpoints       # validate and register Ollama
+DELETE /api/endpoints/{id}  # remove an endpoint
+POST   /api/prompts         # { prompt, client_label } -> completion
+GET    /health              # router health
 POST /v1/chat/completions  # OpenAI-compatible (used by OpenCode)`}</Code>
       </Section>
 
+      <Section title="Routing behavior">
+        New clients are assigned across online, idle Ollama endpoints with round-robin selection. A client
+        stays pinned to its endpoint for the router session. Reservations are atomic, each endpoint handles
+        one request, and failed health checks mark it offline until polling succeeds again.
+      </Section>
+
       <Section title="Dashboard WebSocket">
-        Live supplier and request events stream over a single socket. The console also accepts an optional
+        Live endpoint and request events stream over a single socket. The console also accepts an optional
         <span className="font-mono text-[12px]"> {"{ suppliers: [...] }"} </span> snapshot message.
         <Code>{`WS /ws/dashboard
 
@@ -47,14 +55,14 @@ POST /v1/chat/completions  # OpenAI-compatible (used by OpenCode)`}</Code>
   "timestamp": "2026-09-01T12:00:00Z",
   "request_id": "chatcmpl-…",
   "client_label": "OpenCode client",
-  "supplier_id": "…",
-  "supplier_name": "team-mac-1"
+  "endpoint_id": "…",
+  "endpoint_name": "Omer's Mac"
 }`}</Code>
       </Section>
 
       <Section title="Event categories">
         Each event drives the activity chart, the routing diagram, and the event log.
-        <Code>{`supplier.online   supplier.busy   supplier.offline
+        <Code>{`endpoint.online   endpoint.busy   endpoint.offline
 request.received  request.assigned
 request.processing  request.completed  request.failed`}</Code>
       </Section>
@@ -62,8 +70,8 @@ request.processing  request.completed  request.failed`}</Code>
       <Section title="Field normalization">
         Payload field names are read permissively — <span className="font-mono text-[12px]">snake_case</span> and
         <span className="font-mono text-[12px]"> camelCase</span> both work — so minor backend differences won&apos;t
-        break the UI. Suppliers accept
-        <span className="font-mono text-[12px]"> id, name, model_name, status, active_requests, last_seen_at</span>.
+        break the UI. Endpoints include
+        <span className="font-mono text-[12px]"> id, name, base_url, model_name, status, active_requests, last_seen_at</span>.
       </Section>
     </div>
   );

@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Local LLM Marketplace — Console",
   description:
-    "Live console for a local-network LLM marketplace: suppliers, routing, and request lifecycle.",
+    "Live console for a local-network LLM marketplace: Ollama endpoints, routing, and request lifecycle.",
 };
 
 export default function RootLayout({

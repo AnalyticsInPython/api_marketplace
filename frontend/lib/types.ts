@@ -1,14 +1,14 @@
-/* Shared domain types for the Local LLM Marketplace dashboard.
-   These mirror the spec's supplier registry (§13) and dashboard event model (§12). */
+/* Shared domain types for the Local LLM Marketplace dashboard. */
 
 export type SupplierStatus = "online" | "busy" | "offline";
 
 export interface Supplier {
   id: string;
   name: string;
+  baseUrl: string;
   model: string;
   status: SupplierStatus;
-  /** 0 or 1 — each supplier handles a single active request (spec §8.1). */
+  /** 0 or 1 — each Ollama endpoint handles one routed request. */
   activeRequests: number;
   lastSeen: string | null; // ISO timestamp
 }
@@ -17,6 +17,9 @@ export type DashboardEventType =
   | "supplier.online"
   | "supplier.busy"
   | "supplier.offline"
+  | "endpoint.online"
+  | "endpoint.busy"
+  | "endpoint.offline"
   | "request.received"
   | "request.assigned"
   | "request.processing"
