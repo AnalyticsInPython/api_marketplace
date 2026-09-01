@@ -8,7 +8,7 @@
 - **Router:** Python with FastAPI
 - **Dashboard:** Next.js
 - **Endpoint runtime:** Ollama
-- **Demo model:** `tinyllama` (configurable)
+- **Demo model:** `qwen2.5-coder:1.5b` (configurable)
 
 ### Current implementation status
 
@@ -41,7 +41,7 @@ We will **not build a custom supplier agent or supplier WebSocket protocol**.
 
 Each supplier installs Ollama, downloads the configured model, and exposes Ollama's HTTP API to the local Wi-Fi. The router communicates directly with that API.
 
-The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It changes the public virtual model name (`local-marketplace`) to the real endpoint model (`tinyllama`) before forwarding the request.
+The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It changes the public virtual model name (`local-marketplace`) to the real endpoint model (`qwen2.5-coder:1.5b`) before forwarding the request. It supports complete JSON responses and relayed streaming responses.
 
 ## 4. System Diagram
 
@@ -51,9 +51,9 @@ The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It chang
  OpenCode                         FastAPI Router                    Ollama Endpoint
 ┌──────────┐  POST /v1/chat/     ┌─────────────────┐  POST /v1/chat/ ┌──────────────┐
 │          │  completions        │                 │  completions    │ Supplier Mac │
-│  User    ├────────────────────►│ Select endpoint ├────────────────►│  TinyLlama   │
+│  User    ├────────────────────►│ Select endpoint ├────────────────►│ Qwen2.5 Code │
 │          │◄────────────────────┤ Track requests  │◄────────────────┤              │
-└──────────┘  OpenAI response    └────────┬────────┘  OpenAI response└──────────────┘
+└──────────┘  SSE stream/JSON    └────────┬────────┘  SSE stream/JSON └──────────────┘
                                          │
                                          │ live events (WebSocket)
                                          ▼
@@ -75,11 +75,12 @@ User/OpenCode → Router → Selected Ollama Endpoint → Router → User/OpenCo
 2. The router validates the API key and request.
 3. The router reuses the client's assigned endpoint or selects an available endpoint.
 4. The router marks that endpoint as busy and publishes dashboard events.
-5. The router replaces `model: local-marketplace` with `model: tinyllama`.
-6. The router forwards the request to the endpoint's Ollama `/v1/chat/completions` API with `stream: false`.
-7. Ollama runs the model and returns an OpenAI-compatible response.
-8. The router optionally changes the returned model name back to `local-marketplace`.
-9. The router marks the endpoint as available, updates the dashboard, and returns the response.
+5. The router copies the complete compatible request and replaces `model: local-marketplace` with `model: qwen2.5-coder:1.5b`.
+6. The router forwards the request to the endpoint's Ollama `/v1/chat/completions` API.
+7. For `stream: true`, the router relays Ollama's SSE chunks to OpenCode without rebuilding them.
+8. For `stream: false`, the router returns Ollama's completed JSON response.
+9. The router preserves tool calls so OpenCode can execute them on the user's computer.
+10. The router marks the endpoint as available when the response or stream ends, updates the dashboard, and returns the result.
 
 OpenCode normally includes conversation history in the `messages` array, so the router does not need to store prompts, responses, or conversation history.
 
@@ -96,7 +97,9 @@ The router must:
 - Keep live busy states, request states, and client affinity in memory.
 - Select an available endpoint.
 - Enforce one active request per endpoint.
-- Forward non-streaming requests to Ollama.
+- Forward complete OpenAI-compatible requests, including `messages`, `tools`, `tool_choice`, `stream`, and supported generation options.
+- Relay streaming SSE responses and return complete non-streaming JSON responses.
+- Keep an endpoint busy until its response finishes, its stream closes, or the request fails.
 - Return clear timeout, connection, and availability errors.
 - Publish live request and endpoint events to the dashboard through WebSocket.
 
@@ -109,13 +112,14 @@ Ollama provides:
 - Model installation and storage
 - Local model inference
 - OpenAI-compatible chat completions
+- Streaming responses and tool calls
 - Installed-model discovery through `GET /api/tags`
 - A network HTTP server on port `11434`
 
 Supplier setup:
 
 ```bash
-ollama pull tinyllama
+ollama pull qwen2.5-coder:1.5b
 launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
 ```
 
@@ -148,7 +152,7 @@ SQLite stores only endpoint registration data:
 | `id` | Stable endpoint identifier |
 | `name` | Display name, such as `Omer's Mac` |
 | `base_url` | Ollama URL, such as `http://192.168.1.24:11434` |
-| `model_name` | Configured model, normally `tinyllama` |
+| `model_name` | Configured model, normally `qwen2.5-coder:1.5b` |
 | `created_at` | Registration time |
 | `last_seen_at` | Latest successful health check |
 
@@ -184,11 +188,13 @@ Authorization: Bearer <shared-api-key>
   "messages": [
     {"role": "user", "content": "Why is the sky blue?"}
   ],
-  "stream": false
+  "stream": true
 }
 ```
 
-The router forwards nearly the same JSON to the selected endpoint after changing the model to `tinyllama`.
+The router forwards nearly the same JSON to the selected endpoint after changing the model to `qwen2.5-coder:1.5b`. Compatible fields must be preserved rather than reconstructed from only `model` and `messages`.
+
+For a streaming request, the router returns `text/event-stream` and relays Ollama's chunks, including text deltas, tool-call deltas, finish reasons, usage data, and the final `[DONE]` marker. The dashboard simulator may use `stream: false` for simpler rendering.
 
 ### Supporting endpoints
 
@@ -199,7 +205,46 @@ The router forwards nearly the same JSON to the selected endpoint after changing
 - `WS /ws/dashboard` — live endpoint and request events
 - `GET /health` — router health
 
-## 8. Routing and Client Affinity
+## 8. OpenCode Configuration
+
+Add an `opencode.json` file to the project using the router computer's local IP:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "marketplace/local-marketplace",
+  "provider": {
+    "marketplace": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Local LLM Marketplace",
+      "options": {
+        "baseURL": "http://192.168.1.10:8000/v1",
+        "apiKey": "{env:MARKETPLACE_API_KEY}"
+      },
+      "models": {
+        "local-marketplace": {
+          "name": "Local Marketplace",
+          "limit": {
+            "context": 32768,
+            "output": 2048
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Before starting OpenCode:
+
+```bash
+export MARKETPLACE_API_KEY="marketplace-demo-key"
+opencode
+```
+
+OpenCode executes filesystem and terminal tools locally. The router and Ollama endpoint only relay the tool descriptions and generated tool calls.
+
+## 9. Routing and Client Affinity
 
 - Each endpoint accepts one routed request at a time.
 - A new client is assigned to an available endpoint.
@@ -210,7 +255,9 @@ The router forwards nearly the same JSON to the selected endpoint after changing
 - If the assigned endpoint is busy, offline, or fails, the router returns an error.
 - The MVP does not queue requests or retry them on another endpoint.
 
-## 9. Endpoint Health
+Tool-result follow-up requests from an OpenCode session must return to the same assigned endpoint.
+
+## 10. Endpoint Health
 
 The router periodically calls:
 
@@ -231,17 +278,18 @@ Required dashboard events:
 - `request.completed`
 - `request.failed`
 
-## 10. Errors
+## 11. Errors
 
 - No endpoint available: return HTTP `503`.
-- Invalid request or unsupported streaming: return HTTP `400` or `422`.
+- Invalid request: return HTTP `400` or `422`.
 - Endpoint connection failure: return HTTP `502`.
 - Endpoint inference timeout: return HTTP `504`.
 - Ollama/model error: return a sanitized upstream error.
+- Broken or cancelled stream: close the client stream and release the endpoint's busy state.
 
 The default inference timeout should be configurable and may start at 120 seconds for small models running on CPU.
 
-## 11. Security and Scope
+## 12. Security and Scope
 
 - The system runs only on a trusted local Wi-Fi network.
 - OpenCode requests use one shared router API key.
@@ -250,9 +298,9 @@ The default inference timeout should be configurable and may start at 120 second
 - Full prompts and responses are not persisted.
 - Generated content must be rendered safely in the dashboard.
 
-Credits, payments, user accounts, streaming, multiple selectable models, queues, retries, cloud deployment, and production security are outside the MVP.
+Credits, payments, user accounts, multiple selectable models, queues, retries, cloud deployment, and production security are outside the MVP.
 
-## 12. Suggested Repository Structure
+## 13. Suggested Repository Structure
 
 ```text
 api_marketplace/
@@ -274,15 +322,17 @@ api_marketplace/
 └── spec.md
 ```
 
-## 13. Acceptance Criteria
+## 14. Acceptance Criteria
 
 The MVP is complete when the team can demonstrate:
 
 1. Two Macs running Ollama can be registered in the router.
 2. The dashboard correctly shows online, busy, and offline states.
-3. OpenCode can call the router using `local-marketplace`.
-4. The router selects an endpoint and returns its Ollama response.
-5. The dashboard visualizes the full request path.
-6. Its prompt simulator uses the same routing logic as OpenCode.
-7. Repeated requests from one client remain on the same endpoint during the demo.
-8. Busy, unavailable, disconnected, and timed-out endpoints produce clear errors.
+3. OpenCode can call the router using the documented custom provider and `local-marketplace` model.
+4. The router selects an endpoint and progressively relays its streaming Ollama response to OpenCode.
+5. The router preserves a basic tool call, OpenCode executes it locally, and the follow-up request returns to the same endpoint.
+6. The dashboard visualizes the full request path.
+7. Its prompt simulator uses the same routing logic with a non-streaming request.
+8. Repeated requests from one client remain on the same endpoint during the demo.
+9. A completed, cancelled, or broken stream releases the endpoint's busy state.
+10. Busy, unavailable, disconnected, and timed-out endpoints produce clear errors.
