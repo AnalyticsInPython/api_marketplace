@@ -41,8 +41,8 @@ is in [`spec.md`](spec.md), and complete setup commands are in
 - OpenCode tool definitions and tool-result messages pass through the router.
   Qwen2.5-Coder plain-JSON tool requests are promoted to structured tool calls
   when they match a tool advertised by OpenCode.
-- If the router is unavailable, the dashboard uses its mock engine and retries
-  the live WebSocket every five seconds.
+- If the router is unavailable, the dashboard clears transient data, shows
+  startup and health-check instructions, and retries every five seconds.
 
 ## Architecture decision to know
 

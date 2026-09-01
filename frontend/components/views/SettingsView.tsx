@@ -33,8 +33,8 @@ export function SettingsView({ mode }: { mode: ConnectionMode }) {
           value={
             mode === "live" ? (
               <span className="badge badge-online"><span className="dot pulse" />Live</span>
-            ) : mode === "mock" ? (
-              <span className="badge badge-busy"><span className="dot" />Demo · mock</span>
+            ) : mode === "offline" ? (
+              <span className="badge badge-offline"><span className="dot" />Offline</span>
             ) : (
               <span className="badge badge-offline"><span className="dot pulse" />Connecting</span>
             )
@@ -42,9 +42,9 @@ export function SettingsView({ mode }: { mode: ConnectionMode }) {
         />
         <Row label="Central server" value={<code className="font-mono text-[12px] text-muted">{config.apiBaseUrl}</code>} note="NEXT_PUBLIC_API_BASE_URL" />
         <Row label="Events WebSocket" value={<code className="font-mono text-[12px] text-muted">{config.wsUrl}</code>} note="NEXT_PUBLIC_WS_URL" />
-        <Row label="Force mock data" value={<span className="text-[13px] text-muted">{config.forceMock ? "on" : "off"}</span>} note="NEXT_PUBLIC_USE_MOCK" />
         <Row label="Request timeout" value={<span className="tnum text-[13px] text-muted">120 s</span>} note="CPU inference can be slow (spec §9.5)" />
-        <Row label="Live connect timeout" value={<span className="tnum text-[13px] text-muted">{(config.liveConnectTimeoutMs / 1000).toFixed(1)} s</span>} note="Before falling back to mock" />
+        <Row label="Offline detection" value={<span className="tnum text-[13px] text-muted">{(config.offlineAfterMs / 1000).toFixed(1)} s</span>} note="Before showing setup instructions" />
+        <Row label="Automatic retry" value={<span className="tnum text-[13px] text-muted">{(config.reconnectMs / 1000).toFixed(0)} s</span>} note="While the router is offline" />
       </div>
     </div>
   );

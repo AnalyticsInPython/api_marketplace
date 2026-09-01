@@ -15,8 +15,9 @@
 The FastAPI router, SQLite endpoint registry, health polling, multi-endpoint
 routing, client affinity, concurrency protection, timeout/connection handling,
 dashboard APIs, and dashboard event WebSocket are implemented. The Next.js
-dashboard can register Ollama endpoints, use the real prompt route, and switch
-between live backend data and its offline mock fallback.
+dashboard can register Ollama endpoints, use the real prompt route, and show
+setup instructions when the live backend is unavailable. It never substitutes
+mock suppliers, requests, events, or telemetry for marketplace state.
 
 OpenCode compatibility is implemented through an OpenAI-compatible SSE adapter.
 The router still holds each supplier reservation through a non-streaming Ollama
@@ -148,6 +149,9 @@ The dashboard must:
 - Visualize user → router → endpoint → router → user.
 - Show the selected endpoint, response, error, and session-only event feed.
 - Receive live events from FastAPI through WebSocket.
+- Display only live backend data. When the router is unavailable, clear
+  transient marketplace state and show startup, configuration, and health-check
+  instructions instead of mock data.
 
 ### 6.4 SQLite and In-Memory State
 

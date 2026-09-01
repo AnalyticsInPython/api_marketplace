@@ -1,4 +1,4 @@
-import type { DashboardMetrics, ConnectionMode } from "@/lib/types";
+import type { DashboardMetrics } from "@/lib/types";
 
 function StatTile({
   label,
@@ -23,13 +23,7 @@ function StatTile({
   );
 }
 
-export function MetricsRow({
-  metrics,
-  mode,
-}: {
-  metrics: DashboardMetrics;
-  mode: ConnectionMode;
-}) {
+export function MetricsRow({ metrics }: { metrics: DashboardMetrics }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatTile
@@ -50,9 +44,9 @@ export function MetricsRow({
       />
       <StatTile
         label="Avg latency"
-        value={metrics.avgLatencyMs != null ? (metrics.avgLatencyMs / 1000).toFixed(1) : "—"}
+        value={metrics.avgLatencyMs != null ? (metrics.avgLatencyMs / 1000).toFixed(1) : "-"}
         unit={metrics.avgLatencyMs != null ? "s" : undefined}
-        sub={mode === "mock" ? "simulated" : "received → completed"}
+        sub="received to completed"
       />
     </div>
   );

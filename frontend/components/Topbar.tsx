@@ -22,15 +22,12 @@ function ConnectionPill({ mode }: { mode: ConnectionMode }) {
         Live
       </span>
     );
-  if (mode === "mock")
+  if (mode === "offline")
     return (
-      <span
-        className="badge badge-busy"
-        title="No central server reachable — showing simulated data"
-      >
+      <span className="badge badge-offline" title="The marketplace router is unavailable">
         <span className="dot" />
-        <span className="connection-copy-full">Demo · mock data</span>
-        <span className="connection-copy-short">Demo</span>
+        <span className="connection-copy-full">Router offline</span>
+        <span className="connection-copy-short">Offline</span>
       </span>
     );
   return (
@@ -70,7 +67,7 @@ export function Topbar({
       </div>
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
         <ConnectionPill mode={mode} />
-        <button className="btn btn-primary" onClick={onNewRequest} aria-label="New request">
+        <button className="btn btn-primary" onClick={onNewRequest} aria-label="New request" disabled={mode !== "live"}>
           <IconPlus size={15} />
           <span className="new-request-label">New request</span>
         </button>

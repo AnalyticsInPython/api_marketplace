@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ActiveRequest, ConnectionMode } from "@/lib/types";
+import type { ActiveRequest } from "@/lib/types";
 import { IconPlay } from "./icons";
 
 const EXAMPLES = [
@@ -14,12 +14,10 @@ const EXAMPLES = [
 export function RequestSimulator({
   request,
   busy,
-  mode,
   onSubmit,
 }: {
   request: ActiveRequest;
   busy: boolean;
-  mode: ConnectionMode;
   onSubmit: (prompt: string) => void;
 }) {
   const [prompt, setPrompt] = useState("Explain recursion simply.");
@@ -42,9 +40,8 @@ export function RequestSimulator({
           <div className="eyebrow">Simulate</div>
           <h2 className="mt-1.5 text-[16px] font-semibold text-ink">Send a prompt</h2>
           <p className="mt-1 text-[12.5px] text-muted">
-            Routes through the same service as{" "}
-            <span className="font-mono text-[11.5px] text-dim">POST /v1/chat/completions</span> —{" "}
-            {mode === "mock" ? "simulated locally" : mode === "live" ? "live central server" : "connecting…"}.
+            Routes through the same live service as{" "}
+            <span className="font-mono text-[11.5px] text-dim">POST /v1/chat/completions</span>.
           </p>
         </div>
         <span className="hidden text-[11.5px] text-dim sm:inline">

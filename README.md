@@ -20,7 +20,7 @@ Team members looking for a concise progress handoff should start with
 - OpenCode-compatible SSE responses backed by non-streaming Ollama inference
 - OpenAI tool definition/message forwarding, including a Qwen JSON tool-call shim
 - Endpoint registration, prompt simulation, and live dashboard WebSocket APIs
-- Live dashboard integration with automatic offline mock fallback and reconnect
+- Live-only dashboard integration with offline setup instructions and reconnect
 
 There is no supplier agent. Each supplier Mac exposes Ollama directly on the
 trusted local network, as required by the current architecture in

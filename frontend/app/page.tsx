@@ -12,6 +12,7 @@ import { EventsView } from "@/components/views/EventsView";
 import { ApiKeysView } from "@/components/views/ApiKeysView";
 import { SettingsView } from "@/components/views/SettingsView";
 import { DocsView } from "@/components/views/DocsView";
+import { ConnectionSetup } from "@/components/ConnectionSetup";
 
 export default function Console() {
   const dash = useDashboard();
@@ -59,7 +60,7 @@ export default function Console() {
       ) : null}
 
       <div className="flex min-w-0 flex-col">
-        <Banner />
+        <Banner mode={dash.mode} />
         <div className="sticky top-0 z-20 bg-bg">
           <Topbar
             view={view}
@@ -71,36 +72,37 @@ export default function Console() {
 
         <main className="px-3 py-4 sm:px-6 sm:py-6">
           <div className="mx-auto max-w-[1500px]">
-            {view === "overview" && (
+            {dash.mode !== "live" ? (
+              <ConnectionSetup mode={dash.mode} onRetry={dash.retryConnection} />
+            ) : null}
+            {dash.mode === "live" && view === "overview" && (
               <OverviewView
                 series={dash.series}
                 completions={dash.completions}
                 metrics={dash.metrics}
-                mode={dash.mode}
                 suppliers={dash.suppliers}
                 activeSupplierId={activeSupplierId}
               />
             )}
-            {view === "suppliers" && (
+            {dash.mode === "live" && view === "suppliers" && (
               <SuppliersView
                 suppliers={dash.suppliers}
                 activeSupplierId={activeSupplierId}
                 onRegister={dash.registerEndpoint}
               />
             )}
-            {view === "playground" && (
+            {dash.mode === "live" && view === "playground" && (
               <PlaygroundView
                 request={dash.request}
                 busy={dash.busy}
-                mode={dash.mode}
                 events={dash.events}
                 onSubmit={dash.submitPrompt}
               />
             )}
-            {view === "events" && <EventsView events={dash.events} />}
-            {view === "apikeys" && <ApiKeysView />}
-            {view === "settings" && <SettingsView mode={dash.mode} />}
-            {view === "docs" && <DocsView />}
+            {dash.mode === "live" && view === "events" && <EventsView events={dash.events} />}
+            {dash.mode === "live" && view === "apikeys" && <ApiKeysView />}
+            {dash.mode === "live" && view === "settings" && <SettingsView mode={dash.mode} />}
+            {dash.mode === "live" && view === "docs" && <DocsView />}
           </div>
         </main>
       </div>

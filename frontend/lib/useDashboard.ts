@@ -3,16 +3,14 @@
 /* ---------------------------------------------------------------------------
    useDashboard — single source of truth for the console.
 
-   Tries to connect to the FastAPI central server's dashboard WebSocket
-   (spec §10.4, WS /ws/dashboard). If it can't reach a backend within a short
-   window, it transparently falls back to the built-in MockEngine, so the
-   console is fully interactive on its own. It also maintains a rolling
-   time-series (network load + request latency) that powers the activity chart.
+   Connects to the FastAPI central server's dashboard WebSocket
+   (spec §10.4, WS /ws/dashboard). The console only renders marketplace data
+   received from the live backend. When the router is unavailable, it clears
+   transient state and exposes setup instructions while retrying automatically.
    --------------------------------------------------------------------------- */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "./config";
-import { MockEngine } from "./mockEngine";
 import type {
   ActiveRequest,
   Completion,
@@ -77,32 +75,6 @@ function stageForEvent(type: DashboardEventType): FlowStage {
   }
 }
 
-/* Synthetic history so the activity chart has shape on first load (mock only). */
-function buildSeed(totalNodes: number): { samples: LoadSample[]; comps: Completion[] } {
-  const now = Date.now();
-  const step = 3000;
-  const n = 200; // 10 minutes @ 3s
-  const samples: LoadSample[] = [];
-  const comps: Completion[] = [];
-  let load = 0;
-  let burstLeft = 0;
-  for (let i = 0; i < n; i++) {
-    const t = now - (n - i) * step;
-    if (burstLeft > 0) {
-      burstLeft -= 1;
-      if (burstLeft === 0) {
-        comps.push({ t, latencyMs: 1200 + Math.random() * 2300 });
-        load = 0;
-      }
-    } else if (Math.random() < 0.1) {
-      load = Math.min(totalNodes || 3, 1 + (Math.random() < 0.28 ? 1 : 0));
-      burstLeft = 1 + Math.floor(Math.random() * 3);
-    }
-    samples.push({ t, load });
-  }
-  return { samples, comps };
-}
-
 const IDLE_REQUEST: ActiveRequest = {
   id: null,
   prompt: "",
@@ -120,12 +92,11 @@ export function useDashboard() {
   const [series, setSeries] = useState<LoadSample[]>([]);
   const [completions, setCompletions] = useState<Completion[]>([]);
 
-  const engineRef = useRef<MockEngine | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const retryConnectionRef = useRef<() => void>(() => undefined);
   const modeRef = useRef<ConnectionMode>("connecting");
   const receivedAt = useRef<Map<string, number>>(new Map());
   const suppliersRef = useRef<Supplier[]>([]);
-  const seededRef = useRef(false);
 
   const setModeBoth = (m: ConnectionMode) => {
     modeRef.current = m;
@@ -165,30 +136,20 @@ export function useDashboard() {
     let connectTimer: ReturnType<typeof setTimeout> | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const seedIfMock = () => {
-      if (seededRef.current) return;
-      seededRef.current = true;
-      const { samples, comps } = buildSeed(4);
-      setSeries(samples);
-      setCompletions(comps);
+    const clearTransientState = () => {
+      setSuppliers([]);
+      setEvents([]);
+      setRequest(IDLE_REQUEST);
+      setStats({ completed: 0, failed: 0, latencies: [] });
+      setSeries([]);
+      setCompletions([]);
+      receivedAt.current.clear();
     };
 
-    const startMock = () => {
-      if (disposed || engineRef.current) return;
-      const engine = new MockEngine({
-        onSuppliers: (s) => !disposed && setSuppliers(s),
-        onEvent: (e) => !disposed && ingestEvent(e),
-        onRequest: (r) => !disposed && setRequest(r),
-      });
-      engineRef.current = engine;
-      engine.start();
-      setModeBoth("mock");
-      seedIfMock();
-    };
-
-    const stopMock = () => {
-      engineRef.current?.stop();
-      engineRef.current = null;
+    const markOffline = () => {
+      if (disposed) return;
+      clearTransientState();
+      setModeBoth("offline");
     };
 
     const fetchSuppliers = async () => {
@@ -201,56 +162,50 @@ export function useDashboard() {
         const list = Array.isArray(data) ? data : data.suppliers ?? data.data ?? [];
         if (!disposed) setSuppliers(list.map(normalizeSupplier));
       } catch {
-        /* ignore — WS is the primary channel */
+        /* The WebSocket lifecycle owns the connection state. */
       }
     };
 
     const scheduleReconnect = () => {
-      if (disposed || config.forceMock || reconnectTimer) return;
+      if (disposed || reconnectTimer) return;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = null;
-        tryLive();
-      }, 5000);
+        tryLive(false);
+      }, config.reconnectMs);
     };
 
-    const tryLive = () => {
+    const tryLive = (showConnecting: boolean) => {
       if (disposed) return;
+      if (showConnecting) setModeBoth("connecting");
       let ws: WebSocket;
       try {
         ws = new WebSocket(config.wsUrl);
       } catch {
-        startMock();
+        markOffline();
         scheduleReconnect();
         return;
       }
       wsRef.current = ws;
 
       connectTimer = setTimeout(() => {
-        if (modeRef.current !== "live" && !disposed) {
+        if (modeRef.current !== "live" && !disposed && wsRef.current === ws) {
+          wsRef.current = null;
           try {
             ws.close();
           } catch {
             /* noop */
           }
-          startMock();
+          markOffline();
+          scheduleReconnect();
         }
-      }, config.liveConnectTimeoutMs);
+      }, config.offlineAfterMs);
 
       ws.onopen = () => {
         if (disposed || wsRef.current !== ws) return;
         if (connectTimer) clearTimeout(connectTimer);
         connectTimer = null;
-        const wasMock = modeRef.current === "mock";
-        stopMock();
-        if (wasMock) {
-          setSuppliers([]);
-          setEvents([]);
-          setRequest(IDLE_REQUEST);
-          setStats({ completed: 0, failed: 0, latencies: [] });
-          setSeries([]);
-          setCompletions([]);
-          seededRef.current = false;
-        }
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = null;
         setModeBoth("live");
         void fetchSuppliers();
       };
@@ -295,33 +250,45 @@ export function useDashboard() {
       };
 
       ws.onerror = () => {
-        if (wsRef.current !== ws) return;
-        if (modeRef.current !== "live" && !disposed) {
-          if (connectTimer) clearTimeout(connectTimer);
-          connectTimer = null;
-          startMock();
-          scheduleReconnect();
-        }
+        if (disposed || wsRef.current !== ws) return;
+        wsRef.current = null;
+        if (connectTimer) clearTimeout(connectTimer);
+        connectTimer = null;
+        markOffline();
+        scheduleReconnect();
       };
       ws.onclose = () => {
         if (disposed || wsRef.current !== ws) return;
         wsRef.current = null;
         if (connectTimer) clearTimeout(connectTimer);
         connectTimer = null;
-        startMock();
+        markOffline();
         scheduleReconnect();
       };
     };
 
-    if (config.forceMock) startMock();
-    else tryLive();
+    retryConnectionRef.current = () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+      if (connectTimer) clearTimeout(connectTimer);
+      connectTimer = null;
+      const current = wsRef.current;
+      wsRef.current = null;
+      try {
+        current?.close();
+      } catch {
+        /* noop */
+      }
+      tryLive(true);
+    };
+
+    tryLive(true);
 
     return () => {
       disposed = true;
+      retryConnectionRef.current = () => undefined;
       if (connectTimer) clearTimeout(connectTimer);
       if (reconnectTimer) clearTimeout(reconnectTimer);
-      engineRef.current?.stop();
-      engineRef.current = null;
       try {
         wsRef.current?.close();
       } catch {
@@ -336,6 +303,7 @@ export function useDashboard() {
 
   useEffect(() => {
     const id = setInterval(() => {
+      if (modeRef.current !== "live") return;
       const busy = suppliersRef.current.filter((s) => s.status === "busy").length;
       setSeries((prev) => [...prev, { t: Date.now(), load: busy }].slice(-SERIES_LIMIT));
     }, SAMPLE_MS);
@@ -347,11 +315,6 @@ export function useDashboard() {
   const submitPrompt = useCallback(async (prompt: string) => {
     const text = prompt.trim();
     if (!text) return;
-
-    if (modeRef.current === "mock" && engineRef.current) {
-      engineRef.current.simulate(text, DASHBOARD_CLIENT);
-      return;
-    }
 
     if (modeRef.current === "live") {
       setRequest({
@@ -405,12 +368,16 @@ export function useDashboard() {
     }
   }, []);
 
+  const retryConnection = useCallback(() => {
+    retryConnectionRef.current();
+  }, []);
+
   const registerEndpoint = useCallback(async (
     name: string,
     baseUrl: string,
     modelName: string,
   ): Promise<string | null> => {
-    if (modeRef.current !== "live") return "Connect to the live router before registering an endpoint.";
+    if (modeRef.current !== "live") return "The marketplace router is offline. Reconnect before registering an endpoint.";
     try {
       const res = await fetch(`${config.apiBaseUrl}/api/endpoints`, {
         method: "POST",
@@ -466,6 +433,7 @@ export function useDashboard() {
     completions,
     submitPrompt,
     registerEndpoint,
+    retryConnection,
     busy,
   };
 }

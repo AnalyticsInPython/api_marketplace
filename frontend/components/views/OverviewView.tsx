@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Completion, ConnectionMode, DashboardMetrics, LoadSample, Supplier } from "@/lib/types";
+import type { Completion, DashboardMetrics, LoadSample, Supplier } from "@/lib/types";
 import { MetricsRow } from "@/components/MetricsRow";
 import { ActivityChart } from "@/components/ActivityChart";
 import { SuppliersTable } from "@/components/SuppliersTable";
@@ -43,14 +43,12 @@ export function OverviewView({
   series,
   completions,
   metrics,
-  mode,
   suppliers,
   activeSupplierId,
 }: {
   series: LoadSample[];
   completions: Completion[];
   metrics: DashboardMetrics;
-  mode: ConnectionMode;
   suppliers: Supplier[];
   activeSupplierId?: string;
 }) {
@@ -66,7 +64,7 @@ export function OverviewView({
 
   return (
     <div className="flex flex-col gap-4">
-      <MetricsRow metrics={metrics} mode={mode} />
+      <MetricsRow metrics={metrics} />
 
       {/* Activity chart */}
       <section className="panel px-5 pb-4 pt-5">

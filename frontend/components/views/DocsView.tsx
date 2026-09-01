@@ -23,8 +23,8 @@ export function DocsView() {
       <div>
         <h1 className="text-[19px] font-semibold text-ink">Documentation</h1>
         <p className="mt-1 text-[13px] text-muted">
-          How this console talks to the FastAPI central server. It runs standalone on mock data until a
-          backend is reachable, then switches to live automatically.
+          How this console talks to the FastAPI central server. It only displays data received from the
+          live router and shows setup instructions whenever that connection is unavailable.
         </p>
       </div>
 

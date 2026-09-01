@@ -1,6 +1,6 @@
 "use client";
 
-import type { ActiveRequest, ConnectionMode, DashboardEvent } from "@/lib/types";
+import type { ActiveRequest, DashboardEvent } from "@/lib/types";
 import { RequestSimulator } from "@/components/RequestSimulator";
 import { FlowDiagram } from "@/components/FlowDiagram";
 import { EventFeed } from "@/components/EventFeed";
@@ -8,13 +8,11 @@ import { EventFeed } from "@/components/EventFeed";
 export function PlaygroundView({
   request,
   busy,
-  mode,
   events,
   onSubmit,
 }: {
   request: ActiveRequest;
   busy: boolean;
-  mode: ConnectionMode;
   events: DashboardEvent[];
   onSubmit: (p: string) => void;
 }) {
@@ -28,7 +26,7 @@ export function PlaygroundView({
       </div>
 
       {/* Full-width prompt bar */}
-      <RequestSimulator request={request} busy={busy} mode={mode} onSubmit={onSubmit} />
+      <RequestSimulator request={request} busy={busy} onSubmit={onSubmit} />
 
       {/* Full-width routing */}
       <FlowDiagram request={request} />

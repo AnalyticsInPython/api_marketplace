@@ -6,19 +6,17 @@ left sidebar, a top toolbar, a live activity chart, and dense data tables —
 all sans-serif, with a crimson data accent, a white primary button, and
 restrained status colors (sage / amber / gray).
 
-## Runs standalone (no backend required)
+## Live data only
 
-On load the console tries to connect to the central server's dashboard
-WebSocket. If none is reachable within ~2.5s it **transparently falls back to a
-built-in mock engine** that simulates the whole lifecycle — endpoint selection
-(round-robin), client affinity, one-request-per-endpoint, and
-availability errors — and seeds the activity chart with synthetic history so it
-looks alive immediately. So you can `npm run dev` and click through a fully live
-console today, before the backend exists.
+The console connects to the central server's dashboard WebSocket and only shows
+supplier, request, event, and telemetry data received from the real backend.
+There is no mock engine or synthetic chart history.
 
-When your FastAPI server is running, point the env vars at it and the console
-switches to real data automatically. The pill in the top bar shows **Live** vs
-**Demo · mock data**.
+If the router cannot be reached within about 2.5 seconds, the console clears its
+transient state and shows the commands needed to check Ollama, start FastAPI,
+and verify `/health`. It retries automatically every five seconds and also
+provides a manual Retry connection action. The top bar reports `Live`,
+`Connecting`, or `Router offline`.
 
 ## Quick start
 
@@ -55,7 +53,6 @@ All settings are env vars (see `.env.example`):
 | `NEXT_PUBLIC_API_BASE_URL` | FastAPI base URL (`/api/endpoints`, `/api/prompts`) | `http://localhost:8000` |
 | `NEXT_PUBLIC_WS_URL` | Dashboard events WebSocket (`WS /ws/dashboard`) | `ws://localhost:8000/ws/dashboard` |
 | `NEXT_PUBLIC_API_KEY` | Shared bearer token, if the dashboard endpoints require it | _(empty)_ |
-| `NEXT_PUBLIC_USE_MOCK` | Force the mock engine even when a backend is reachable | `false` |
 
 ### Expected backend payloads
 
@@ -89,8 +86,7 @@ frontend/
 │                         # ApiKeys, Settings, Docs
 ├── lib/
 │   ├── types.ts  config.ts  format.ts
-│   ├── mockEngine.ts      # standalone lifecycle simulator
-│   └── useDashboard.ts    # WS + API wiring, mock fallback, chart series
+│   └── useDashboard.ts    # WS + API wiring, offline handling, chart series
 └── .env.example
 ```
 

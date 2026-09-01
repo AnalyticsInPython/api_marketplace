@@ -72,7 +72,7 @@ export interface ActiveRequest {
   finishedAt?: number;
 }
 
-export type ConnectionMode = "connecting" | "live" | "mock";
+export type ConnectionMode = "connecting" | "live" | "offline";
 
 /** One sample of network load (busy supplier count) at a point in time. */
 export interface LoadSample {
