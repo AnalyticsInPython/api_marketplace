@@ -42,6 +42,7 @@ function normalizeSupplier(raw: any): Supplier {
     model: String(raw.model ?? raw.model_name ?? "qwen2.5-coder:1.5b"),
     status: ["online", "busy", "offline"].includes(status) ? status : "offline",
     activeRequests: Number(raw.active_requests ?? raw.activeRequests ?? 0),
+    tokensUsed: Number(raw.tokens_used ?? raw.tokensUsed ?? 0),
     lastSeen: raw.last_seen_at ?? raw.last_seen ?? raw.lastSeen ?? null,
   };
 }

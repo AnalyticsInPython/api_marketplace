@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Supplier } from "@/lib/types";
 import { StatusBadge } from "./StatusBadge";
 import { IconPin } from "./icons";
-import { relativeTime } from "@/lib/format";
+import { compactCount, relativeTime } from "@/lib/format";
 
 export function SuppliersTable({
   suppliers,
@@ -29,7 +29,7 @@ export function SuppliersTable({
   return (
     <div className="panel overflow-hidden">
       <div className="scroll-thin overflow-x-auto">
-        <table className="dtable min-w-[720px]">
+        <table className="dtable min-w-[800px]">
           <thead>
             <tr>
               <th style={{ width: 40 }}>
@@ -40,13 +40,14 @@ export function SuppliersTable({
               <th>Host</th>
               <th>Status</th>
               <th>Load</th>
+              <th className="num">Tokens</th>
               <th className="num">Last seen</th>
             </tr>
           </thead>
           <tbody>
             {suppliers.length === 0 ? (
               <tr>
-                <td colSpan={7} className="muted" style={{ textAlign: "center", padding: "34px" }}>
+                <td colSpan={8} className="muted" style={{ textAlign: "center", padding: "34px" }}>
                   No endpoints match. Register a Mac running Ollama to begin.
                 </td>
               </tr>
@@ -92,6 +93,9 @@ export function SuppliersTable({
                         />
                         <span className="tnum text-[12px] text-muted">{s.activeRequests} / 1</span>
                       </span>
+                    </td>
+                    <td className="num muted" title={`${s.tokensUsed.toLocaleString("en-US")} tokens`}>
+                      {compactCount(s.tokensUsed)}
                     </td>
                     <td className="num muted">{relativeTime(s.lastSeen)}</td>
                   </tr>
