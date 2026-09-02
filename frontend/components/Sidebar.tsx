@@ -117,13 +117,13 @@ export function Sidebar({
 
       {/* Local POC identity */}
       <div className="border-t border-line p-2">
-        <div className="nav-item w-[calc(100%-16px)] cursor-default" title="Local operator">
+        <div className="nav-item w-[calc(100%-16px)] cursor-default" title="User">
           <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-panel-3 text-[11px] font-semibold text-ink">
-            L
+            U
           </span>
           {!collapsed && (
             <>
-              <span className="nav-label flex-1 truncate text-left">Local operator</span>
+              <span className="nav-label flex-1 truncate text-left">User</span>
               <IconChevronDown size={14} className="text-dim" />
             </>
           )}
