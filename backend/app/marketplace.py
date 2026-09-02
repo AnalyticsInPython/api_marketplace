@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+import socket
 import uuid
 from collections import deque
 from dataclasses import dataclass
@@ -71,6 +72,7 @@ class InferenceResult:
     endpoint_name: str
     content: str
     response: dict[str, Any]
+    routing_notice: str | None = None
 
 
 class Marketplace:
@@ -96,6 +98,7 @@ class Marketplace:
         )
         self._client = httpx.AsyncClient(transport=transport)
         self._poll_task: asyncio.Task[None] | None = None
+        self._router_local_hosts = self._discover_router_local_hosts()
 
     async def start(self) -> None:
         await self.poll_health()
@@ -181,8 +184,9 @@ class Marketplace:
         )
 
         state: EndpointState | None = None
+        routing_notice: str | None = None
         try:
-            state = await self._reserve(client_id, request_id)
+            state, routing_notice = await self._reserve(client_id, request_id)
             await self.emit(
                 "endpoint.busy",
                 request_id=request_id,
@@ -195,6 +199,7 @@ class Marketplace:
                 client_label=client_label,
                 endpoint_id=state.record.id,
                 endpoint_name=state.record.name,
+                message=routing_notice,
             )
             await self.broadcast_snapshot()
             await self.emit(
@@ -261,6 +266,7 @@ class Marketplace:
                 endpoint_name=state.record.name,
                 content=content,
                 response=payload,
+                routing_notice=routing_notice,
             )
             await self.emit(
                 "request.completed",
@@ -350,7 +356,35 @@ class Marketplace:
         ]
         choice["finish_reason"] = "tool_calls"
 
-    async def _reserve(self, client_id: str, request_id: str) -> EndpointState:
+    @staticmethod
+    def _discover_router_local_hosts() -> set[str]:
+        """Return hostnames and addresses that identify the router computer."""
+        hosts = {"localhost", "127.0.0.1", "::1"}
+        for name in {socket.gethostname(), socket.getfqdn()}:
+            if not name:
+                continue
+            hosts.add(name.lower().rstrip("."))
+            try:
+                hosts.update(
+                    address[4][0].lower().rstrip(".")
+                    for address in socket.getaddrinfo(name, None)
+                )
+            except OSError:
+                pass
+        return hosts
+
+    def _is_router_local_endpoint(self, state: EndpointState) -> bool:
+        host = (urlparse(state.record.base_url).hostname or "").lower().rstrip(".")
+        if host in self._router_local_hosts:
+            return True
+        try:
+            return ipaddress.ip_address(host).is_loopback
+        except ValueError:
+            return False
+
+    async def _reserve(
+        self, client_id: str, request_id: str
+    ) -> tuple[EndpointState, str | None]:
         async with self._lock:
             if client_id in self._inflight_clients:
                 raise ClientRequestInFlight(
@@ -358,15 +392,26 @@ class Marketplace:
                 )
 
             state: EndpointState | None = None
+            online_local = [
+                item
+                for item in self._states.values()
+                if item.online and self._is_router_local_endpoint(item)
+            ]
+            routing_notice = None
+            if online_local:
+                routing_notice = (
+                    "Local Ollama is running on the router laptop and was skipped; "
+                    "this request was routed to another laptop."
+                )
             affinity_id = self._affinity.get(client_id)
             if affinity_id:
                 pinned = self._states.get(affinity_id)
                 if pinned is None:
                     self._affinity.pop(client_id, None)
-                elif not pinned.online:
-                    raise EndpointUnavailable(
-                        f"the client's assigned endpoint {pinned.record.name} is offline"
-                    )
+                elif not pinned.online or self._is_router_local_endpoint(pinned):
+                    # Stale or local affinity must not prevent a healthy remote
+                    # laptop from accepting the next request.
+                    self._affinity.pop(client_id, None)
                 elif pinned.active_request_id:
                     raise ClientRequestInFlight(
                         f"the client's assigned endpoint {pinned.record.name} is busy"
@@ -379,11 +424,18 @@ class Marketplace:
                     (
                         item
                         for item in self._states.values()
-                        if item.online and item.active_request_id is None
+                        if item.online
+                        and item.active_request_id is None
+                        and not self._is_router_local_endpoint(item)
                     ),
                     key=lambda item: (item.record.created_at, item.record.name),
                 )
                 if not available:
+                    if online_local:
+                        raise NoEndpointAvailable(
+                            "Local Ollama is running on this laptop but local routing "
+                            "is disabled; no other online laptop is available"
+                        )
                     raise NoEndpointAvailable("no online endpoint is available")
                 index = self._round_robin_cursor % len(available)
                 state = available[index]
@@ -392,7 +444,7 @@ class Marketplace:
 
             state.active_request_id = request_id
             self._inflight_clients.add(client_id)
-            return state
+            return state, routing_notice
 
     async def _release(
         self, client_id: str, request_id: str, state: EndpointState

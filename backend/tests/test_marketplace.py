@@ -258,11 +258,12 @@ def test_new_client_uses_another_endpoint_while_first_is_busy(tmp_path: Path) ->
             assert first.result(timeout=2).status_code == 200
 
 
-def test_timeout_marks_endpoint_offline_and_keeps_affinity(tmp_path: Path) -> None:
+def test_timeout_marks_endpoint_offline_and_clears_stale_affinity(tmp_path: Path) -> None:
     ollama = FakeOllama()
     app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
     with TestClient(app) as client:
         register(client, "Node A", "node-a")
+        second_endpoint = register(client, "Node B", "node-b")
         ollama.behavior["node-a"] = "timeout"
 
         response = submit(client, "client-a")
@@ -270,9 +271,38 @@ def test_timeout_marks_endpoint_offline_and_keeps_affinity(tmp_path: Path) -> No
         assert "exceeded" in response.json()["detail"]
         assert client.get("/api/endpoints").json()["suppliers"][0]["status"] == "offline"
 
-        pinned = submit(client, "client-a")
-        assert pinned.status_code == 503
-        assert "assigned endpoint" in pinned.json()["detail"]
+        rerouted = submit(client, "client-a")
+        assert rerouted.status_code == 200
+        assert rerouted.json()["marketplace"]["endpoint_id"] == second_endpoint["id"]
+
+
+def test_router_local_ollama_is_skipped_with_notice(tmp_path: Path) -> None:
+    ollama = FakeOllama()
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        register(client, "Router Mac", "127.0.0.1")
+        remote = register(client, "Remote Mac", "node-b")
+
+        response = submit(client, "client-a")
+
+        assert response.status_code == 200
+        assert [call[0] for call in ollama.calls] == ["node-b"]
+        marketplace = response.json()["marketplace"]
+        assert marketplace["endpoint_id"] == remote["id"]
+        assert "Local Ollama" in marketplace["routing_notice"]
+
+
+def test_router_local_ollama_is_never_used_as_last_resort(tmp_path: Path) -> None:
+    ollama = FakeOllama()
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        register(client, "Router Mac", "127.0.0.1")
+
+        response = submit(client, "client-a")
+
+        assert response.status_code == 503
+        assert "local routing is disabled" in response.json()["detail"]
+        assert ollama.calls == []
 
 
 def test_connection_failure_marks_endpoint_offline(tmp_path: Path) -> None:

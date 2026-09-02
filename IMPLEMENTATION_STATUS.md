@@ -16,6 +16,10 @@ is in [`spec.md`](spec.md), and complete setup commands are in
 - New clients are distributed between online endpoints with round-robin routing.
 - A client's `X-Client-ID` remains pinned to the same endpoint for the current
   router session.
+- Router-local Ollama endpoints are skipped, with a visible notice when local
+  Ollama is running and a remote laptop receives the request.
+- Offline affinity is cleared so a subsequent request can move to another
+  healthy laptop.
 - Selection and busy-state reservation are atomic, so two requests cannot be
   assigned to the same endpoint simultaneously.
 - An endpoint handles one marketplace request at a time. There is no queue and
@@ -70,7 +74,7 @@ OpenCode or Dashboard → FastAPI Router → Selected Ollama Mac → Router → 
 
 ## Verification completed
 
-- Thirteen backend integration tests pass.
+- Fifteen backend integration tests pass.
 - Tests cover round-robin routing, affinity, simultaneous requests, busy-state
   protection, second-endpoint selection, timeouts, connection loss, persistence,
   API authentication, deletion, registration validation, and dashboard events.

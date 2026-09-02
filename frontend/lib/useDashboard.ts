@@ -360,6 +360,7 @@ export function useDashboard() {
           stage: "done",
           supplierName: data?.supplier_name ?? prev.supplierName,
           response: content,
+          routingNotice: data?.routing_notice ?? undefined,
           finishedAt: Date.now(),
         }));
       } catch {
