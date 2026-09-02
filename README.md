@@ -66,10 +66,18 @@ chmod +x ~/Downloads/configure-ollama-macos.sh
 ~/Downloads/configure-ollama-macos.sh
 ```
 
-The helper pulls `qwen2.5-coder:1.5b`, sets the permanent `OLLAMA_HOST`, restarts
-Ollama, checks port `11434`, and prints the Wi-Fi endpoint URL. macOS may still
-require the operator to approve its firewall prompt. Restore localhost-only mode
-with `~/Downloads/configure-ollama-macos.sh --restore-localhost`.
+The helper pulls `qwen2.5-coder:1.5b`, sets `OLLAMA_HOST` for the current login
+session, restarts Ollama, checks port `11434`, and prints the Wi-Fi endpoint URL.
+macOS may still require the operator to approve its firewall prompt.
+
+**After the demo, every supplier must undo this.** While `OLLAMA_HOST` is set,
+Ollama accepts unauthenticated requests from any device on any network the Mac
+joins, and Ollama's API includes model management (`/api/pull`, `/api/delete`),
+not just inference. The setting is cleared by restarting the Mac, or by running:
+
+```bash
+~/Downloads/configure-ollama-macos.sh --restore-localhost
+```
 
 The equivalent manual setup remains:
 

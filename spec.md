@@ -149,8 +149,9 @@ http://192.168.1.24:11434
 The dashboard must:
 
 - Register an endpoint using a display name and local-network URL.
-- Provide a downloadable macOS helper that pulls Qwen, configures the permanent
-  Ollama network bind, restarts Ollama, and prints the supplier URL.
+- Provide a downloadable macOS helper that pulls Qwen, configures the Ollama
+  network bind for the current login session, restarts Ollama, prints the
+  supplier URL, and tells the operator how to undo the bind afterwards.
 - Diagnose a proposed endpoint from the router by checking `/api/version`,
   `/api/tags`, the requested model, and whether the address is safe for a
   trusted local network.
