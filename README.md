@@ -28,6 +28,16 @@ There is no supplier agent. Each supplier Mac exposes Ollama directly on the
 trusted local network, as required by the current architecture in
 [`spec.md`](spec.md#3-architecture-decision).
 
+## Requirements
+
+- **Python 3.10 or newer** for the router. macOS ships Python 3.9, which cannot
+  run the backend: FastAPI resolves `str | None` type annotations at startup and
+  that syntax requires 3.10+. Check yours with `python3 --version`. The `uv`
+  commands below install a suitable Python without replacing the system one.
+- **Node.js 18.17 or newer** for the dashboard, as required by Next.js 14.
+  Check with `node --version`.
+- **Ollama** on every supplier Mac, plus the `qwen2.5-coder:1.5b` model.
+
 ## Start the router
 
 Python 3.10 or newer is required. On macOS, `uv` can install a suitable Python
@@ -59,10 +69,18 @@ chmod +x ~/Downloads/configure-ollama-macos.sh
 ~/Downloads/configure-ollama-macos.sh
 ```
 
-The helper pulls `qwen2.5-coder:1.5b`, sets the permanent `OLLAMA_HOST`, restarts
-Ollama, checks port `11434`, and prints the Wi-Fi endpoint URL. macOS may still
-require the operator to approve its firewall prompt. Restore localhost-only mode
-with `~/Downloads/configure-ollama-macos.sh --restore-localhost`.
+The helper pulls `qwen2.5-coder:1.5b`, sets `OLLAMA_HOST` for the current login
+session, restarts Ollama, checks port `11434`, and prints the Wi-Fi endpoint URL.
+macOS may still require the operator to approve its firewall prompt.
+
+**After the demo, every supplier must undo this.** While `OLLAMA_HOST` is set,
+Ollama accepts unauthenticated requests from any device on any network the Mac
+joins, and Ollama's API includes model management (`/api/pull`, `/api/delete`),
+not just inference. The setting is cleared by restarting the Mac, or by running:
+
+```bash
+~/Downloads/configure-ollama-macos.sh --restore-localhost
+```
 
 The MVP uses `qwen2.5-coder:1.5b` as its default and verified demo model, but it
 does not block other models. An endpoint may register any exact model tag shown

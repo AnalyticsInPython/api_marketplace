@@ -31,6 +31,7 @@ if [[ "${1:-}" == "--restore-localhost" ]]; then
   launchctl unsetenv OLLAMA_HOST
   restart_ollama
   echo "Ollama was restored to localhost-only mode."
+  echo "It is no longer reachable from the network."
   exit 0
 fi
 
@@ -97,5 +98,10 @@ echo "Endpoint URL: http://$WIFI_IP:11434"
 echo "Model: $MODEL_NAME"
 echo
 echo "Paste the endpoint URL into the marketplace dashboard and run network checks."
-echo "To restore localhost-only mode later, run:"
+echo
+echo "IMPORTANT - when the demo is over, turn network access back off."
+echo "Until you do, Ollama stays reachable with no password to every device on"
+echo "any Wi-Fi network this Mac joins, including public ones."
+echo
+echo "Either restart this Mac, which clears the setting, or run:"
 echo "  $0 --restore-localhost"

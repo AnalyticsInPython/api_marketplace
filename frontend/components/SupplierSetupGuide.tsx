@@ -119,6 +119,24 @@ export function SupplierSetupGuide() {
             After the endpoint appears online, use Send routed test to confirm the complete route from this dashboard through Ollama and back.
           </p>
         </Instruction>
+
+        <Instruction
+          number={5}
+          title="Turn network access off when the demo ends"
+          action={
+            <div>
+              <div className="text-[11.5px] font-medium text-ink">Either restart the Mac, or run</div>
+              <pre className="scroll-thin mt-2 overflow-x-auto rounded-[8px] border border-line bg-bg px-3 py-2.5 font-mono text-[11px] leading-relaxed text-muted">{`~/Downloads/configure-ollama-macos.sh --restore-localhost`}</pre>
+            </div>
+          }
+        >
+          <p>
+            The setup helper makes Ollama reachable to your whole network for the rest of this login session. Until you undo it, this Mac keeps accepting unauthenticated Ollama requests on every Wi-Fi network it joins, including public ones.
+          </p>
+          <p className="mt-2 text-[11.5px] text-dim">
+            Ollama has no password of its own, and its API can download and delete models, not just answer prompts. Restarting the Mac clears the setting.
+          </p>
+        </Instruction>
       </ol>
     </section>
   );
