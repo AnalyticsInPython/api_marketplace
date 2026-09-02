@@ -18,6 +18,12 @@ Git history is the authoritative record; this file is the readable summary.
 
 ### Fixed
 
+- **Endpoint table headers sat flush against the divider above them.**
+  `.dtable thead th` used `padding: 0 14px 9px`, giving the labels no space above
+  and 9px below, so they read as pushed upward out of the header band. The
+  padding is now symmetric. Affects the tables on both Overview and Endpoints.
+  (2026-09-02)
+
 - **The sidebar could not be reopened once collapsed.** The collapse control was
   rendered only while the sidebar was expanded, so collapsing it removed the only
   way back; the topbar's menu button is mobile-only. The control now stays
