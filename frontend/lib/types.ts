@@ -10,6 +10,8 @@ export interface Supplier {
   status: SupplierStatus;
   /** 0 or 1 — each Ollama endpoint handles one routed request. */
   activeRequests: number;
+  /** Cumulative prompt + completion tokens served, reset when the router restarts. */
+  tokensUsed: number;
   lastSeen: string | null; // ISO timestamp
 }
 

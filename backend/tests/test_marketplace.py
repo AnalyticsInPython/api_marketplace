@@ -74,6 +74,17 @@ class FakeOllama:
                             "finish_reason": "stop",
                         }
                     ],
+                    **(
+                        {}
+                        if behavior == "no_usage"
+                        else {
+                            "usage": {
+                                "prompt_tokens": 7,
+                                "completion_tokens": 11,
+                                "total_tokens": 18,
+                            }
+                        }
+                    ),
                 },
             )
         return httpx.Response(404)
@@ -470,3 +481,43 @@ def test_dashboard_cors_accepts_private_lan_origins_only(tmp_path: Path) -> None
             "/health", headers={"Origin": "https://untrusted.example.com"}
         )
         assert "access-control-allow-origin" not in public.headers
+
+
+def test_endpoint_accumulates_tokens_used(tmp_path: Path) -> None:
+    ollama = FakeOllama()
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        endpoint = register(client, "Node A", "node-a")
+
+        def tokens_for(endpoint_id: str) -> int:
+            suppliers = client.get("/api/endpoints").json()["suppliers"]
+            return next(s["tokens_used"] for s in suppliers if s["id"] == endpoint_id)
+
+        assert tokens_for(endpoint["id"]) == 0
+
+        submit(client, "client-a")
+        assert tokens_for(endpoint["id"]) == 18
+
+        submit(client, "client-a")
+        assert tokens_for(endpoint["id"]) == 36
+
+        # An upstream response without a usage block must not break the tally.
+        ollama.behavior["node-a"] = "no_usage"
+        submit(client, "client-a")
+        assert tokens_for(endpoint["id"]) == 36
+
+
+def test_tokens_used_is_tracked_per_endpoint(tmp_path: Path) -> None:
+    ollama = FakeOllama()
+    app = create_app(settings(tmp_path), transport=httpx.MockTransport(ollama))
+    with TestClient(app) as client:
+        first = register(client, "Node A", "node-a")
+        second = register(client, "Node B", "node-b")
+
+        submit(client, "client-a")  # round-robin -> node-a
+        submit(client, "client-b")  # round-robin -> node-b
+        submit(client, "client-a")  # affinity -> node-a
+
+        suppliers = {s["id"]: s["tokens_used"] for s in client.get("/api/endpoints").json()["suppliers"]}
+        assert suppliers[first["id"]] == 36
+        assert suppliers[second["id"]] == 18

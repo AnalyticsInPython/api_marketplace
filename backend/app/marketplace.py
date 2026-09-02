@@ -54,6 +54,7 @@ class EndpointState:
     record: EndpointRecord
     online: bool = False
     active_request_id: str | None = None
+    tokens_used: int = 0
 
     @property
     def status(self) -> str:
@@ -253,6 +254,12 @@ class Marketplace:
 
             payload["id"] = f"chatcmpl-{request_id}"
             payload["model"] = "local-marketplace"
+            usage = payload.get("usage")
+            if isinstance(usage, dict):
+                total = usage.get("total_tokens")
+                if isinstance(total, int) and total > 0:
+                    async with self._lock:
+                        state.tokens_used += total
             result = InferenceResult(
                 request_id=request_id,
                 endpoint_id=state.record.id,
@@ -684,6 +691,9 @@ class Marketplace:
                     1
                     if record.id in states and states[record.id].active_request_id
                     else 0
+                ),
+                "tokens_used": (
+                    states[record.id].tokens_used if record.id in states else 0
                 ),
                 "last_seen_at": record.last_seen_at,
             }
