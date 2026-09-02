@@ -7,6 +7,14 @@ Git history is the authoritative record; this file is the readable summary.
 
 ## [Unreleased]
 
+### Added
+
+- **README now states the required Python and Node versions.** The backend needs
+  Python 3.10+ (macOS ships 3.9, which cannot start FastAPI because it fails on
+  `str | None` annotations) and the dashboard needs Node 18.17+ for Next.js 14.
+  Neither was documented, so a teammate on stock macOS Python hit an unexplained
+  startup crash. (2026-09-02)
+
 ### Fixed
 
 - **OpenCode setup used the wrong API key.** `spec.md` instructed readers to run

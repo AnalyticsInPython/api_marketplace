@@ -28,10 +28,21 @@ There is no supplier agent. Each supplier Mac exposes Ollama directly on the
 trusted local network, as required by the current architecture in
 [`spec.md`](spec.md#3-architecture-decision).
 
+## Requirements
+
+- **Python 3.10 or newer** for the router. macOS ships Python 3.9, which cannot
+  run the backend: FastAPI resolves `str | None` type annotations at startup and
+  that syntax requires 3.10+. Check yours with `python3 --version`. If it is 3.9,
+  install a newer one with `brew install python@3.12` and substitute that
+  interpreter in the command below.
+- **Node.js 18.17 or newer** for the dashboard, as required by Next.js 14.
+  Check with `node --version`.
+- **Ollama** on every supplier Mac, plus the `qwen2.5-coder` model.
+
 ## Start the router
 
 ```bash
-python3 -m venv .venv
+python3 -m venv .venv   # must be Python 3.10+; use python3.12 if python3 is 3.9
 .venv/bin/pip install -r backend/requirements-dev.txt
 cp backend/.env.example backend/.env
 .venv/bin/uvicorn backend.app.main:create_app --factory \
