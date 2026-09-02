@@ -9,6 +9,14 @@ Git history is the authoritative record; this file is the readable summary.
 
 ### Added
 
+- **Endpoint tables show cumulative tokens served.** The router now accumulates
+  `usage.total_tokens` per endpoint as requests complete and reports it as
+  `tokens_used` on `GET /api/endpoints` and the dashboard WebSocket snapshot. A
+  new Tokens column sits between Load and Last seen, abbreviating large values
+  (549, 1.2K, 2.5M, 1.1B) with the exact count on hover. The tally is in-memory
+  and resets when the router restarts, like busy state and affinity. (2026-09-02)
+
+
 - **Suppliers are now told to turn network access off after the demo.** The setup
   helper, the dashboard setup guide (new step 5), and the README all explain that
   while `OLLAMA_HOST` is set the Mac accepts unauthenticated Ollama requests on
