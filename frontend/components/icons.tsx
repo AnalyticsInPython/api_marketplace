@@ -105,6 +105,12 @@ export const IconChevronLeft = ({ size = 16, className }: P) => (
   </svg>
 );
 
+export const IconChevronRight = ({ size = 16, className }: P) => (
+  <svg {...base(size)} className={className}>
+    <path d="m9 6 6 6-6 6" />
+  </svg>
+);
+
 export const IconPlus = ({ size = 16, className }: P) => (
   <svg {...base(size)} className={className}>
     <path d="M12 5v14M5 12h14" />

@@ -109,9 +109,12 @@ body {
 }
 
 .mobile-scrim,
-.mobile-menu-button,
-.mobile-close,
 .connection-copy-short {
+  display: none;
+}
+/* Specificity must beat `.btn-icon`, which sets its own display. */
+.btn-icon.mobile-menu-button,
+.btn-icon.mobile-close {
   display: none;
 }
 
@@ -137,6 +140,11 @@ body {
 }
 .collapsed .nav-group-label {
   opacity: 0;
+}
+.collapsed .sidebar-brand {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .nav-item {
@@ -273,6 +281,10 @@ body {
   border-color: var(--border-strong);
 }
 .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
   width: 32px;
   height: 32px;
   padding: 0;
@@ -690,12 +702,12 @@ kbd {
     backdrop-filter: blur(2px);
   }
 
-  .mobile-menu-button,
-  .mobile-close {
+  .btn-icon.mobile-menu-button,
+  .btn-icon.mobile-close {
     display: inline-flex;
   }
 
-  .desktop-collapse {
+  .btn-icon.desktop-collapse {
     display: none;
   }
 
