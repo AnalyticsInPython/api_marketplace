@@ -269,7 +269,7 @@ Add an `opencode.json` file to the project using the router computer's local IP:
 Before starting OpenCode:
 
 ```bash
-export MARKETPLACE_API_KEY="marketplace-demo-key"
+export MARKETPLACE_API_KEY="dev-marketplace-key"
 opencode
 ```
 
