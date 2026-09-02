@@ -10,6 +10,7 @@ import {
   IconSettings,
   IconDocs,
   IconChevronLeft,
+  IconChevronRight,
   IconChevronDown,
   IconClose,
 } from "./icons";
@@ -66,24 +67,24 @@ export function Sidebar({
   return (
     <aside className={`sidebar ${mobileOpen ? "mobile-open" : ""}`} aria-label="Primary navigation">
       {/* Brand */}
-      <div className="flex h-[52px] items-center justify-between border-b border-line px-4">
-        <div className="flex items-center gap-2.5 overflow-hidden">
-          <Logo size={18} />
-          {!collapsed && (
+      <div className="sidebar-brand flex h-[52px] items-center justify-between border-b border-line px-4">
+        {!collapsed && (
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <Logo size={18} />
             <span className="whitespace-nowrap text-[13px] font-semibold tracking-[0.14em] text-ink">
               MARKETPLACE
             </span>
-          )}
-        </div>
-        {!collapsed && (
-          <button
-            className="btn-icon desktop-collapse"
-            onClick={onToggleCollapse}
-            aria-label="Collapse sidebar"
-          >
-            <IconChevronLeft size={16} />
-          </button>
+          </div>
         )}
+        <button
+          className="btn-icon desktop-collapse"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-expanded={!collapsed}
+        >
+          {collapsed ? <IconChevronRight size={16} /> : <IconChevronLeft size={16} />}
+        </button>
         <button className="btn-icon mobile-close" onClick={onCloseMobile} aria-label="Close navigation">
           <IconClose size={16} />
         </button>
@@ -116,13 +117,13 @@ export function Sidebar({
 
       {/* Local POC identity */}
       <div className="border-t border-line p-2">
-        <div className="nav-item w-[calc(100%-16px)] cursor-default" title="Local operator">
+        <div className="nav-item w-[calc(100%-16px)] cursor-default" title="User">
           <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-panel-3 text-[11px] font-semibold text-ink">
-            L
+            U
           </span>
           {!collapsed && (
             <>
-              <span className="nav-label flex-1 truncate text-left">Local operator</span>
+              <span className="nav-label flex-1 truncate text-left">User</span>
               <IconChevronDown size={14} className="text-dim" />
             </>
           )}

@@ -18,6 +18,24 @@ Git history is the authoritative record; this file is the readable summary.
 
 ### Fixed
 
+- **Endpoint table headers sat flush against the divider above them.**
+  `.dtable thead th` used `padding: 0 14px 9px`, giving the labels no space above
+  and 9px below, so they read as pushed upward out of the header band. The
+  padding is now symmetric. Affects the tables on both Overview and Endpoints.
+  (2026-09-02)
+
+- **The sidebar could not be reopened once collapsed.** The collapse control was
+  rendered only while the sidebar was expanded, so collapsing it removed the only
+  way back; the topbar's menu button is mobile-only. The control now stays
+  rendered, flipping to a right chevron with an `Expand sidebar` label, and is
+  centred in the 60px rail. (2026-09-02)
+- **Icon buttons rendered their glyph off-centre.** `.btn-icon` set a 32px box but
+  no flex centring, and Tailwind's preflight makes `svg` a block element, so the
+  16px glyph sat 1px from the left edge and 15px from the right. It is now centred
+  on all four sides. The mobile/desktop visibility rules were given matching
+  specificity so they still win over the new `display` value. (2026-09-02)
+
+
 - **The Ollama network bind was documented as permanent.** `spec.md` and the
   README described the setup helper as configuring a "permanent" bind. It uses
   `launchctl setenv`, which lasts only for the current login session and is lost
