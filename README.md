@@ -30,6 +30,23 @@ trusted local network, as required by the current architecture in
 
 ## Start the router
 
+The simplest way to prepare and start the router and dashboard together is:
+
+```bash
+./start-marketplace.sh
+```
+
+The launcher is safe to repeat. On the first run it creates the local
+configuration files and environments and installs missing dependencies. It
+reuses healthy services that are already running and keeps any services it
+starts attached to the Terminal window so `Ctrl+C` stops them cleanly. When
+this Mac already has Ollama and Qwen2.5-Coder running, the launcher reports it
+but does not register or route to it. Set `AUTO_REGISTER_LOCAL_OLLAMA=true`
+before the command only when you intentionally want to register the router Mac;
+router-local endpoints remain excluded from inference routing.
+
+For manual setup, use:
+
 Python 3.10 or newer is required. On macOS, `uv` can install a suitable Python
 without replacing the system Python:
 
@@ -90,8 +107,10 @@ the public `local-marketplace` model with that endpoint's configured model, and
 calls its `/v1/chat/completions` API. The response returns through the router to
 the user, the endpoint becomes online again, and WebSocket events update the
 dashboard. During the router session, the same client remains assigned to the
-same endpoint. If that endpoint is busy or offline, the MVP returns an error;
-it does not queue the request or silently move the client to another endpoint.
+same remote endpoint while it is healthy. If that endpoint is known to be
+offline, its stale affinity is cleared and the next healthy remote laptop is
+selected. A failure discovered during an active request still returns an error
+and marks that endpoint offline; the MVP does not queue or retry that request.
 
 The equivalent manual setup remains:
 

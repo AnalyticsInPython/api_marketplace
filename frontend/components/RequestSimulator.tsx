@@ -98,6 +98,11 @@ export function RequestSimulator({
                   </span>
                 ) : null}
               </div>
+              {request.routingNotice ? (
+                <div className="mb-3 rounded-[10px] border border-busy/30 bg-busy/10 px-4 py-3 text-[12.5px] text-ink">
+                  {request.routingNotice}
+                </div>
+              ) : null}
               {request.response ? (
                 <div className="scroll-thin max-h-60 overflow-y-auto whitespace-pre-wrap rounded-[10px] border border-line bg-bg px-4 py-3.5 text-[14px] leading-relaxed text-ink">
                   {request.response}

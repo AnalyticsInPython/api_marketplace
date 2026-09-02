@@ -94,6 +94,7 @@ export interface ActiveRequest {
   supplierId?: string;
   supplierName?: string;
   response?: string;
+  routingNotice?: string;
   error?: string;
   startedAt?: number;
   finishedAt?: number;

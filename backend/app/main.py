@@ -105,6 +105,7 @@ def create_app(
             "supplier_name": result.endpoint_name,
             "endpoint_id": result.endpoint_id,
             "endpoint_name": result.endpoint_name,
+            "routing_notice": result.routing_notice,
         }
 
     @app.get("/health")
@@ -149,6 +150,7 @@ def create_app(
             "request_id": result.request_id,
             "endpoint_id": result.endpoint_id,
             "endpoint_name": result.endpoint_name,
+            "routing_notice": result.routing_notice,
         }
         if not body.stream:
             return response

@@ -4,7 +4,7 @@ import type { ConnectionMode } from "@/lib/types";
 export function Banner({ mode }: { mode: ConnectionMode }) {
   const message =
     mode === "live"
-      ? "Qwen2.5-Coder is available across the local network. OpenCode requests route through the marketplace API."
+      ? "The marketplace router is live. Registered Ollama endpoints can now receive routed requests."
       : mode === "offline"
         ? "The marketplace router is offline. Start the local services and retry the connection."
         : "Checking the marketplace router and registered Ollama endpoints.";

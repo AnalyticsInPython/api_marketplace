@@ -355,9 +355,14 @@ OpenCode executes filesystem and terminal tools locally. The router and Ollama e
 - A new client is assigned to an available endpoint.
 - If several endpoints are available, the router uses round-robin selection.
 - Repeated requests from the same client use the same endpoint during the current router session.
+- Endpoints hosted on the router computer are excluded from inference routing;
+  when local Ollama is detected, the client receives a notice that another
+  laptop was selected.
 - The implementation uses `X-Client-ID` when supplied and falls back to the
   client's IP address. The dashboard uses its stable `client_label`.
-- If the assigned endpoint is busy, offline, or fails, the router returns an error.
+- If the assigned endpoint is offline, its stale affinity is cleared and the
+  next healthy remote endpoint is selected. A failure discovered during an
+  active request still returns an error and marks that endpoint offline.
 - The MVP does not queue requests or retry them on another endpoint.
 
 Tool-result follow-up requests from an OpenCode session must return to the same assigned endpoint.
