@@ -1,4 +1,4 @@
-# Implementation Status — September 1, 2026
+# Implementation Status — September 2, 2026
 
 This document is the short handoff for the team. The detailed product contract
 is in [`spec.md`](spec.md), and complete setup commands are in
@@ -80,6 +80,12 @@ OpenCode or Dashboard → FastAPI Router → Selected Ollama Mac → Router → 
   `/api/endpoints` successfully.
 - A real local request completed through FastAPI → Ollama/Qwen2.5-Coder.
 - A real OpenCode turn selected and executed its `read` tool through the router.
+- Two physical Macs were registered from the dashboard on the same Wi-Fi. New
+  client IDs were routed to different computers, a repeated client remained on
+  its assigned computer, and all real completions returned through the router.
+- The dashboard prompt flow, busy/online transitions, and a real OpenCode
+  request through the remote supplier were observed during the two-Mac
+  walkthrough.
 
 Run the same checks with:
 
@@ -92,14 +98,10 @@ npm run build
 
 ## What the team should do next
 
-1. Put the router Mac and at least two supplier Macs on the same trusted Wi-Fi.
-2. On each supplier, download and run the macOS helper from the Endpoints view.
-3. Paste the printed supplier URL into the UI and run network checks.
-4. Register each endpoint and send the routed `REMOTE_TEST_OK` check.
-5. Send requests with two different `X-Client-ID` values and confirm round-robin
-   assignment; repeat one ID and confirm affinity.
-6. Exercise offline, busy, disconnect, and timeout scenarios from the acceptance
-   criteria in `spec.md`.
+1. Rehearse the documented startup commands shortly before the presentation.
+2. Confirm each supplier's current Wi-Fi IP because DHCP addresses can change.
+3. Prefer the 7B model for an optional OpenCode tool demonstration when the
+   supplier hardware can run it; keep 1.5B for the fast routing demonstration.
 
 ## Known MVP limitations
 
@@ -112,5 +114,8 @@ npm run build
 - Ollama endpoints have no API authentication and must stay off the public internet
 - A browser cannot change another Mac's process or firewall remotely. The
   supplier operator must run the downloaded helper and approve macOS prompts.
+- On one verified Mac, reopening Ollama did not inherit the `launchctl`
+  environment. Running `OLLAMA_HOST=0.0.0.0:11434 ollama serve` in a Terminal
+  provided the reliable demo fallback.
 - Live busy state, affinity, active requests, and event history reset when the
   router restarts

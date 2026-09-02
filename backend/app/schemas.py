@@ -47,7 +47,7 @@ class EndpointCreate(BaseModel):
 
     name: str = Field(min_length=1, max_length=100)
     base_url: str = Field(min_length=8, max_length=500)
-    model_name: str = Field(default="qwen2.5-coder", min_length=1, max_length=200)
+    model_name: str = Field(default="qwen2.5-coder:1.5b", min_length=1, max_length=200)
 
     @field_validator("name", "model_name")
     @classmethod
@@ -67,7 +67,7 @@ class EndpointDiagnosticRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     base_url: str = Field(min_length=8, max_length=500)
-    model_name: str = Field(default="qwen2.5-coder", min_length=1, max_length=200)
+    model_name: str = Field(default="qwen2.5-coder:1.5b", min_length=1, max_length=200)
 
     @field_validator("model_name")
     @classmethod

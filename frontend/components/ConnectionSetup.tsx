@@ -69,7 +69,7 @@ export function ConnectionSetup({
           <SetupRow
             title="Install Qwen"
             detail="Confirm the marketplace model is present. The pull command is safe to repeat and only downloads missing layers."
-            command={"ollama list\nollama pull qwen2.5-coder"}
+            command={"ollama list\nollama pull qwen2.5-coder:1.5b"}
           />
           <SetupRow
             title="Start the router"

@@ -111,7 +111,7 @@ export function SuppliersView({
   const [filter, setFilter] = useState<Filter>("all");
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
-  const [modelName, setModelName] = useState("qwen2.5-coder");
+  const [modelName, setModelName] = useState("qwen2.5-coder:1.5b");
   const [diagnosing, setDiagnosing] = useState(false);
   const [diagnostic, setDiagnostic] = useState<EndpointDiagnostic | null>(null);
   const [registering, setRegistering] = useState(false);
@@ -215,7 +215,7 @@ export function SuppliersView({
                 Ollama model
                 <input
                   className="field font-mono"
-                  placeholder="qwen2.5-coder"
+                  placeholder="qwen2.5-coder:1.5b"
                   value={modelName}
                   onChange={(event) => {
                     setModelName(event.target.value);

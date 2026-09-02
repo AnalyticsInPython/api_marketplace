@@ -290,10 +290,11 @@ class Marketplace:
     ) -> None:
         """Convert Qwen's plain JSON tool request into OpenAI tool_calls.
 
-        Some Ollama Qwen builds advertise tool support but return a pure
-        ``{"name": ..., "arguments": ...}`` object as assistant text. Only
-        promote it when the named function was explicitly advertised by the
-        caller, so normal JSON responses remain ordinary text.
+        Some Ollama Qwen builds advertise tool support but return a plain or
+        Markdown-fenced JSON object as assistant text. They may also use either
+        ``name`` or ``function`` for the tool name. Only promote it when the
+        named function was explicitly advertised by the caller, so normal JSON
+        responses remain ordinary text.
         """
         tools = upstream_options.get("tools")
         if not isinstance(tools, list) or not tools:
@@ -302,13 +303,18 @@ class Marketplace:
         message = choice["message"]
         if message.get("tool_calls") or not isinstance(message.get("content"), str):
             return
+        raw_content = message["content"].strip()
+        if raw_content.startswith("```") and raw_content.endswith("```"):
+            lines = raw_content.splitlines()
+            if len(lines) >= 3 and lines[0].strip().lower() in {"```", "```json"}:
+                raw_content = "\n".join(lines[1:-1]).strip()
         try:
-            candidate = json.loads(message["content"].strip())
+            candidate = json.loads(raw_content)
         except (json.JSONDecodeError, TypeError):
             return
         if not isinstance(candidate, dict):
             return
-        name = candidate.get("name")
+        name = candidate.get("name") or candidate.get("function")
         arguments = candidate.get("arguments", {})
         allowed_names = {
             tool.get("function", {}).get("name")
@@ -433,13 +439,19 @@ class Marketplace:
             for model in payload.get("models", [])
             if isinstance(model, dict)
         }
-        requested_base = model_name.split(":", 1)[0]
-        if model_name not in installed and not any(
-            item.split(":", 1)[0] == requested_base for item in installed
-        ):
+        if not self._model_is_installed(model_name, installed):
             raise EndpointInferenceError(
                 f"model {model_name!r} is not installed on that endpoint"
             )
+
+    @staticmethod
+    def _model_is_installed(model_name: str, installed: set[str] | list[str]) -> bool:
+        """Match Ollama's implicit ``:latest`` alias without changing model size."""
+        if model_name in installed:
+            return True
+        if ":" not in model_name:
+            return f"{model_name}:latest" in installed
+        return False
 
     async def diagnose_endpoint(
         self, base_url: str, model_name: str
@@ -561,10 +573,8 @@ class Marketplace:
                 }
             )
 
-        requested_base = model_name.split(":", 1)[0]
-        model_available = reachable and (
-            model_name in installed
-            or any(item.split(":", 1)[0] == requested_base for item in installed)
+        model_available = reachable and self._model_is_installed(
+            model_name, installed
         )
         if reachable and not model_available:
             issues.append(

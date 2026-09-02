@@ -113,7 +113,7 @@ export function SupplierSetupGuide() {
           }
         >
           <p>
-            In the form below, add a display name and paste the URL from Terminal. Leave the model as qwen2.5-coder unless your router expects another model. Run network checks, resolve any reported issue, then select Submit endpoint.
+            In the form below, add a display name and paste the URL from Terminal. Leave the model as qwen2.5-coder:1.5b unless you installed another exact tag. Run network checks, resolve any reported issue, then select Submit endpoint.
           </p>
           <p className="mt-2 text-[11.5px] text-dim">
             After the endpoint appears online, use Send routed test to confirm the complete route from this dashboard through Ollama and back.
