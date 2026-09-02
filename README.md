@@ -8,6 +8,115 @@ lifecycle to the Next.js dashboard.
 Team members looking for a concise progress handoff should start with
 [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md).
 
+## Quick start: run everything on one Mac
+
+In this mode, one computer runs every component:
+
+```text
+OpenCode or Dashboard → FastAPI router → Ollama → qwen2.5-coder:1.5b
+                              │
+                            SQLite
+```
+
+Ollama does not need to be exposed to Wi-Fi for this setup.
+
+### 1. Install the prerequisites
+
+This project requires macOS, Git, `uv`, Node.js, Ollama, and optionally
+OpenCode. With [Homebrew](https://brew.sh/) installed:
+
+```bash
+brew install uv node
+curl -fsSL https://ollama.com/install.sh | sh
+brew install anomalyco/tap/opencode
+```
+
+OpenCode is optional if you only want to use the web dashboard. Ollama's macOS
+download requires macOS 14 or newer.
+
+### 2. Download and prepare the project
+
+```bash
+git clone https://github.com/AnalyticsInPython/api_marketplace.git
+cd api_marketplace
+
+uv python install 3.12
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python -r backend/requirements-dev.txt
+cp backend/.env.example backend/.env
+
+cd frontend
+npm install
+cp .env.example .env.local
+cd ..
+
+ollama pull qwen2.5-coder:1.5b
+```
+
+Open the Ollama application and confirm it is ready:
+
+```bash
+curl http://127.0.0.1:11434/api/version
+```
+
+### 3. Start the router
+
+In Terminal 1, from the repository root:
+
+```bash
+.venv/bin/uvicorn backend.app.main:create_app --factory \
+  --host 127.0.0.1 --port 8000 --env-file backend/.env
+```
+
+Leave it running. Confirm it responds at
+[`http://127.0.0.1:8000/health`](http://127.0.0.1:8000/health).
+
+### 4. Start the dashboard
+
+In Terminal 2:
+
+```bash
+cd frontend
+npm run dev -- --hostname 127.0.0.1
+```
+
+Open [`http://127.0.0.1:3000`](http://127.0.0.1:3000).
+
+### 5. Register the local model
+
+In the dashboard, open **Endpoints** and enter:
+
+```text
+Name: My Mac
+Endpoint URL: http://127.0.0.1:11434
+Model: qwen2.5-coder:1.5b
+```
+
+Select **Run network checks**, then **Submit endpoint**. A localhost warning is
+expected because all components are on the same computer. The Ollama and model
+checks must pass, and `My Mac` should appear as `online`.
+
+### 6. Use the system
+
+For the web interface, open **Playground**, enter a prompt, and select **Run
+prompt**. The page shows the selected endpoint, response, request flow, and live
+events.
+
+For OpenCode, use Terminal 3 from the repository root:
+
+```bash
+export MARKETPLACE_API_KEY="dev-marketplace-key"
+opencode
+```
+
+The checked-in `opencode.json` selects `marketplace/local-marketplace`. Enter a
+question normally; OpenCode sends it to FastAPI, which routes it to the local
+Ollama model. The 1.5B model works well for the routing demo but may be
+unreliable for multi-step tool use.
+
+To stop the project, press **Control-C** in the router and dashboard terminals
+and quit the Ollama application.
+
 ## Implemented
 
 - Persistent SQLite registration for multiple Ollama endpoints
@@ -49,7 +158,9 @@ empty value only when you intentionally want to disable authentication. SQLite
 stores endpoint registrations; busy state, affinity, active requests, and event
 history remain in memory.
 
-## Prepare each Ollama Mac
+## Optional: add supplier Macs over Wi-Fi
+
+### Prepare each Ollama Mac
 
 The dashboard Endpoints view now provides a downloadable setup helper. On the
 supplier Mac, download it from the dashboard and run:
@@ -71,7 +182,7 @@ by its `ollama list` output, provided the model works with Ollama's
 OpenCode tool behavior depends on the selected model and should be checked when
 adding a new one.
 
-## Register an endpoint
+### Register an endpoint
 
 1. The supplier starts Ollama, installs the demo model, and exposes port `11434`
    to the trusted local Wi-Fi.
