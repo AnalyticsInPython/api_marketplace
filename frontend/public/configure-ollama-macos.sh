@@ -76,7 +76,14 @@ fi
 
 if ! lsof -nP -iTCP:11434 -sTCP:LISTEN | grep -Eq '(\*|0\.0\.0\.0):11434'; then
   echo "Ollama is running, but port 11434 is not exposed to the network yet."
-  echo "Quit and reopen Ollama, allow the macOS firewall prompt, then run this script again."
+  echo "The Ollama app did not inherit OLLAMA_HOST. For this demo, quit Ollama and"
+  echo "stop the localhost-only process shown by lsof. Then run this in Terminal"
+  echo "and keep that Terminal window open:"
+  echo
+  echo "  OLLAMA_HOST=0.0.0.0:11434 $OLLAMA_BIN serve"
+  echo
+  echo "In another Terminal, verify:"
+  echo "  curl http://$WIFI_IP:11434/api/version"
   exit 1
 fi
 

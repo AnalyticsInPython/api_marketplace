@@ -8,7 +8,11 @@
 - **Router:** Python with FastAPI
 - **Dashboard:** Next.js
 - **Endpoint runtime:** Ollama
-- **Demo model:** `qwen2.5-coder` (configurable)
+- **Demo model:** `qwen2.5-coder:1.5b` (configurable)
+
+The configured model name must identify an installed Ollama tag. An omitted tag
+means Ollama's `:latest` alias; it does not match a different size such as
+`:1.5b` or `:7b`.
 
 ### Current implementation status
 
@@ -29,9 +33,76 @@ OpenCode compatibility is implemented through an OpenAI-compatible SSE adapter.
 The router still holds each supplier reservation through a non-streaming Ollama
 completion, then emits the completed text or tool call as SSE frames. OpenCode
 tool definitions and tool-result messages are forwarded to the selected endpoint.
+The compatibility adapter also promotes Qwen tool requests returned as plain or
+Markdown-fenced JSON using either a `name` or `function` field, but only when
+the named tool was explicitly advertised in the client request.
 
-The remaining environment-level milestone is the manual two-Mac Wi-Fi demo
-against real Ollama instances.
+The manual two-Mac Wi-Fi milestone was completed on September 2, 2026, against
+two real Ollama instances.
+
+### Local router verification — September 2, 2026
+
+The router was manually started with Python 3.12 and connected to a real local
+Ollama 0.33.2 endpoint running `qwen2.5-coder:1.5b`. Health, API-key rejection,
+model listing, endpoint diagnosis, endpoint registration, dashboard prompting,
+non-streaming inference, and OpenAI-compatible SSE output were verified. This
+check exposed and fixed ambiguous model-tag validation: registration now rejects
+`qwen2.5-coder` when only `qwen2.5-coder:1.5b` is installed, preventing a later
+Ollama 404 during inference.
+
+### Multi-endpoint verification — September 2, 2026
+
+Two real Ollama 0.33.2 HTTP servers were run locally on ports `11434` and
+`11435` with `qwen2.5-coder:1.5b`. The router registered both endpoints and
+verified round-robin assignment for new clients, session affinity for a repeat
+client, visible busy state during a long inference, HTTP 409 for a concurrent
+request from the same client, routing of a different client to the other free
+endpoint, health-poll transition to offline after one server stopped, HTTP 503
+for the client pinned to that offline endpoint, and successful routing of a new
+client to the remaining online endpoint. SQLite registrations and derived
+online/offline state also survived a router restart. Round-robin and affinity
+were subsequently repeated with two physical Macs during final acceptance.
+
+### OpenCode verification — September 2, 2026
+
+OpenCode 1.18.25 loaded the checked-in `marketplace/local-marketplace` provider
+and completed a normal chat request through FastAPI and a real local Ollama
+endpoint. In a read-only tool test, Qwen returned a Markdown-fenced JSON request
+using a `function` field. The compatibility adapter promoted it to an OpenAI
+tool call, OpenCode executed `Read proposal.md` locally, and the tool-result
+follow-up reached the router. The 1.5B model then emitted malformed JSON instead
+of a clean final answer. Transport and tool execution are verified, but complete
+agent-loop reliability remains model-dependent; a larger tool-capable model is
+recommended when demonstrating multi-step OpenCode work.
+
+### Dashboard integration verification — September 2, 2026
+
+The Next.js dashboard served successfully and its production build completed.
+Against the live router and real local Ollama endpoint, the dashboard contracts
+for diagnosis, registration, endpoint snapshots, and prompt simulation were
+verified; the prompt `What is 5 plus 7?` returned `12` through the registered
+supplier. A real dashboard WebSocket connection received the initial supplier
+snapshot followed by `request.received`, `endpoint.busy`, `request.assigned`,
+`request.processing`, `request.completed`, and `endpoint.online` events with
+matching request and endpoint identifiers. The rendered status changes and flow
+animation were subsequently observed during the final browser walkthrough.
+
+### Two-Mac acceptance walkthrough — September 2, 2026
+
+The router/dashboard Mac and a supplier Mac were connected on the same Wi-Fi.
+The dashboard diagnosed the remote Ollama 0.33.2 server, found both the 1.5B and
+7B Qwen tags, and registered `qwen2.5-coder:1.5b` from the UI. A second endpoint
+on the router Mac was also diagnosed and registered from the UI. The endpoint
+table showed both computers online, routed prompts displayed the selected
+supplier, and the request flow and busy/online transitions were observed.
+
+Two new client IDs were assigned to different physical Macs; repeating the
+first ID returned to the same supplier. A final OpenCode request completed
+through the router while the dashboard displayed its events. The supplier
+walkthrough also identified a macOS startup limitation: on that Mac, the Ollama
+app did not inherit the `launchctl` value after restarting. The verified
+fallback is to keep
+`OLLAMA_HOST=0.0.0.0:11434 ollama serve` running in a supplier Terminal.
 
 The system routes LLM requests from OpenCode or a web dashboard to available team computers running local models. The main project work is the central API/router and its visualization. Ollama provides model installation, inference, and the HTTP server on every endpoint computer.
 
@@ -53,7 +124,7 @@ We will **not build a custom supplier agent or supplier WebSocket protocol**.
 
 Each supplier installs Ollama, downloads the configured model, and exposes Ollama's HTTP API to the local Wi-Fi. The router communicates directly with that API.
 
-The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It changes the public virtual model name (`local-marketplace`) to the real endpoint model (`qwen2.5-coder`) before forwarding the request.
+The router uses OpenAI-compatible `/v1/chat/completions` on both sides. It changes the public virtual model name (`local-marketplace`) to the selected endpoint's exact configured model tag before forwarding the request.
 
 ## 4. System Diagram
 
@@ -129,10 +200,13 @@ Ollama provides:
 - Installed-model discovery through `GET /api/tags`
 - A network HTTP server on port `11434`
 
+The endpoint must be registered with the exact installed tag shown by
+`ollama list`, except that `model-name` and `model-name:latest` are equivalent.
+
 Supplier setup:
 
 ```bash
-ollama pull qwen2.5-coder
+ollama pull qwen2.5-coder:1.5b
 launchctl setenv OLLAMA_HOST "0.0.0.0:11434"
 ```
 
@@ -180,7 +254,7 @@ SQLite stores only endpoint registration data:
 | `id` | Stable endpoint identifier |
 | `name` | Display name, such as `Omer's Mac` |
 | `base_url` | Ollama URL, such as `http://192.168.1.24:11434` |
-| `model_name` | Configured model, normally `qwen2.5-coder` |
+| `model_name` | Configured model, normally `qwen2.5-coder:1.5b` |
 | `created_at` | Registration time |
 | `last_seen_at` | Latest successful health check |
 
@@ -221,7 +295,7 @@ Authorization: Bearer <shared-api-key>
 ```
 
 The router forwards nearly the same JSON to the selected endpoint after changing
-the model to `qwen2.5-coder` and forcing the supplier-side request to
+the model to the endpoint's exact configured tag and forcing the supplier-side request to
 `stream: false`. If the client requested streaming, the router returns the
 completed Ollama response as OpenAI-compatible SSE frames.
 
