@@ -7,6 +7,7 @@ import { RequestSimulator } from "@/components/RequestSimulator";
 import { FlowDiagram } from "@/components/FlowDiagram";
 import { EventFeed } from "@/components/EventFeed";
 import { UserSetupGuide } from "@/components/UserSetupGuide";
+import { PrivatePromptHistory } from "@/components/PrivatePromptHistory";
 
 export function PlaygroundView({
   request,
@@ -86,6 +87,8 @@ export function PlaygroundView({
       <div id="prompt-submission" className="scroll-mt-24">
         <RequestSimulator request={request} busy={busy} onSubmit={onSubmit} />
       </div>
+
+      <PrivatePromptHistory request={request} />
 
       {/* Full-width routing */}
       <FlowDiagram request={request} />

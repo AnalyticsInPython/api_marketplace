@@ -101,6 +101,8 @@ export type RequestStatus =
   | "failed";
 
 export interface ActiveRequest {
+  /** Browser-local identifier used only for private Playground history. */
+  historyId?: string;
   id: string | null;
   prompt: string;
   clientLabel: string;
