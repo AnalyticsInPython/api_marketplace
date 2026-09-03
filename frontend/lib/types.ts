@@ -12,6 +12,10 @@ export interface Supplier {
   activeRequests: number;
   /** Cumulative prompt + completion tokens served, reset when the router restarts. */
   tokensUsed: number;
+  /** Successful requests served during this router session. */
+  completedRequests: number;
+  /** Average response time for successful requests during this session. */
+  avgResponseMs: number | null;
   lastSeen: string | null; // ISO timestamp
 }
 
@@ -40,6 +44,15 @@ export interface RoutedNetworkTest {
   supplierName: string;
   content: string;
   matchedExpectedReply: boolean;
+}
+
+export interface BurstResult {
+  requestId: string;
+  clientLabel: string;
+  supplierName: string | null;
+  status: "completed" | "failed";
+  latencyMs: number;
+  error?: string;
 }
 
 export type DashboardEventType =

@@ -133,6 +133,16 @@ def test_round_robin_affinity_and_model_translation(tmp_path: Path) -> None:
         assert response_b.json()["marketplace"]["endpoint_id"] == second["id"]
         assert response_a2.json()["marketplace"]["endpoint_id"] == first["id"]
 
+        snapshot = client.get("/api/endpoints").json()["suppliers"]
+        node_a = next(item for item in snapshot if item["id"] == first["id"])
+        node_b = next(item for item in snapshot if item["id"] == second["id"])
+        assert node_a["completed_requests"] == 2
+        assert node_a["tokens_used"] == 36
+        assert isinstance(node_a["avg_response_ms"], int)
+        assert node_a["avg_response_ms"] >= 0
+        assert node_b["completed_requests"] == 1
+        assert node_b["tokens_used"] == 18
+
 
 def test_streaming_request_returns_openai_compatible_sse(tmp_path: Path) -> None:
     ollama = FakeOllama()

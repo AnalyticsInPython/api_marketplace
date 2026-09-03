@@ -100,6 +100,7 @@ export default function Console() {
                 events={dash.events}
                 onlineSupplierCount={dash.suppliers.filter((supplier) => supplier.status === "online").length}
                 onSubmit={dash.submitPrompt}
+                onTrafficBurst={dash.runTrafficBurst}
               />
             )}
             {dash.mode === "live" && view === "events" && <EventsView events={dash.events} />}
