@@ -232,6 +232,9 @@ def create_app(
             "model_name": record.model_name,
             "status": "online",
             "active_requests": 0,
+            "tokens_used": 0,
+            "completed_requests": 0,
+            "avg_response_ms": None,
             "last_seen_at": record.last_seen_at,
         }
 

@@ -6,6 +6,7 @@ import { MetricsRow } from "@/components/MetricsRow";
 import { ActivityChart } from "@/components/ActivityChart";
 import { SuppliersTable } from "@/components/SuppliersTable";
 import { IconSearch } from "@/components/icons";
+import { SupplierLeaderboard } from "@/components/SupplierLeaderboard";
 
 type Show = "active" | "latency" | "both";
 const WINDOWS = [
@@ -65,6 +66,8 @@ export function OverviewView({
   return (
     <div className="flex flex-col gap-4">
       <MetricsRow metrics={metrics} />
+
+      <SupplierLeaderboard suppliers={suppliers} />
 
       {/* Activity chart */}
       <section className="panel px-5 pb-4 pt-5">

@@ -44,6 +44,11 @@ function normalizeSupplier(raw: any): Supplier {
     status: ["online", "busy", "offline"].includes(status) ? status : "offline",
     activeRequests: Number(raw.active_requests ?? raw.activeRequests ?? 0),
     tokensUsed: Number(raw.tokens_used ?? raw.tokensUsed ?? 0),
+    completedRequests: Number(raw.completed_requests ?? raw.completedRequests ?? 0),
+    avgResponseMs:
+      raw.avg_response_ms == null && raw.avgResponseMs == null
+        ? null
+        : Number(raw.avg_response_ms ?? raw.avgResponseMs),
     lastSeen: raw.last_seen_at ?? raw.last_seen ?? raw.lastSeen ?? null,
   };
 }

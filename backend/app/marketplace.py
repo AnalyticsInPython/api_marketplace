@@ -55,6 +55,8 @@ class EndpointState:
     online: bool = False
     active_request_id: str | None = None
     tokens_used: int = 0
+    completed_requests: int = 0
+    total_latency_ms: int = 0
 
     @property
     def status(self) -> str:
@@ -177,6 +179,7 @@ class Marketplace:
         upstream_options: dict[str, Any],
     ) -> InferenceResult:
         request_id = str(uuid.uuid4())
+        started_at = asyncio.get_running_loop().time()
         await self.emit(
             "request.received",
             request_id=request_id,
@@ -255,11 +258,20 @@ class Marketplace:
             payload["id"] = f"chatcmpl-{request_id}"
             payload["model"] = "local-marketplace"
             usage = payload.get("usage")
+            total_tokens = 0
             if isinstance(usage, dict):
                 total = usage.get("total_tokens")
                 if isinstance(total, int) and total > 0:
-                    async with self._lock:
-                        state.tokens_used += total
+                    total_tokens = total
+            latency_ms = round(
+                (asyncio.get_running_loop().time() - started_at) * 1000
+            )
+            async with self._lock:
+                current = self._states.get(state.record.id)
+                if current is state:
+                    state.tokens_used += total_tokens
+                    state.completed_requests += 1
+                    state.total_latency_ms += latency_ms
             result = InferenceResult(
                 request_id=request_id,
                 endpoint_id=state.record.id,
@@ -694,6 +706,20 @@ class Marketplace:
                 ),
                 "tokens_used": (
                     states[record.id].tokens_used if record.id in states else 0
+                ),
+                "completed_requests": (
+                    states[record.id].completed_requests
+                    if record.id in states
+                    else 0
+                ),
+                "avg_response_ms": (
+                    round(
+                        states[record.id].total_latency_ms
+                        / states[record.id].completed_requests
+                    )
+                    if record.id in states
+                    and states[record.id].completed_requests > 0
+                    else None
                 ),
                 "last_seen_at": record.last_seen_at,
             }
