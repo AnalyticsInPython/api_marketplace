@@ -13,6 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config, resolveApiBaseUrl, resolveWsUrl } from "./config";
 import type {
   ActiveRequest,
+  BurstResult,
   Completion,
   ConnectionMode,
   DashboardEvent,
@@ -374,6 +375,73 @@ export function useDashboard() {
     }
   }, []);
 
+  const runTrafficBurst = useCallback(async (
+    requestCount: number,
+  ): Promise<BurstResult[]> => {
+    if (modeRef.current !== "live") return [];
+    const onlineCount = suppliersRef.current.filter((supplier) => supplier.status === "online").length;
+    if (onlineCount === 0) return [];
+
+    const results: BurstResult[] = [];
+    const burstId = Date.now();
+    const prompts = [
+      "Reply in one short sentence: what makes distributed computing useful?",
+      "Reply with exactly three words describing local AI.",
+      "Give one practical benefit of sharing spare compute.",
+      "Write a five-word slogan for an AI marketplace.",
+      "Name one advantage of running models locally.",
+      "In one sentence, explain load balancing.",
+      "Give one privacy benefit of local inference.",
+      "Reply with a short celebration message.",
+    ];
+
+    // Run one request per currently available endpoint at a time. Additional
+    // requests form another wave, avoiding expected 503s in this no-queue MVP.
+    for (let offset = 0; offset < requestCount; offset += onlineCount) {
+      const wave = Array.from(
+        { length: Math.min(onlineCount, requestCount - offset) },
+        (_, waveIndex) => offset + waveIndex,
+      );
+      const waveResults = await Promise.all(wave.map(async (index): Promise<BurstResult> => {
+        const clientLabel = `traffic-burst-${burstId}-${index + 1}`;
+        const startedAt = Date.now();
+        try {
+          const res = await fetch(`${apiBaseUrl}/api/prompts`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+            },
+            body: JSON.stringify({
+              prompt: prompts[index % prompts.length],
+              client_label: clientLabel,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data?.detail ?? `Request failed (${res.status})`);
+          return {
+            requestId: String(data.request_id ?? ""),
+            clientLabel,
+            supplierName: String(data.supplier_name ?? data.endpoint_name ?? "Unknown endpoint"),
+            status: "completed",
+            latencyMs: Date.now() - startedAt,
+          };
+        } catch (error) {
+          return {
+            requestId: "",
+            clientLabel,
+            supplierName: null,
+            status: "failed",
+            latencyMs: Date.now() - startedAt,
+            error: error instanceof Error ? error.message : "Request failed",
+          };
+        }
+      }));
+      results.push(...waveResults);
+    }
+    return results;
+  }, []);
+
   const retryConnection = useCallback(() => {
     retryConnectionRef.current();
   }, []);
@@ -523,6 +591,7 @@ export function useDashboard() {
     series,
     completions,
     submitPrompt,
+    runTrafficBurst,
     registerEndpoint,
     diagnoseEndpoint,
     runNetworkTest,

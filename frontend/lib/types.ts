@@ -42,6 +42,15 @@ export interface RoutedNetworkTest {
   matchedExpectedReply: boolean;
 }
 
+export interface BurstResult {
+  requestId: string;
+  clientLabel: string;
+  supplierName: string | null;
+  status: "completed" | "failed";
+  latencyMs: number;
+  error?: string;
+}
+
 export type DashboardEventType =
   | "supplier.online"
   | "supplier.busy"
