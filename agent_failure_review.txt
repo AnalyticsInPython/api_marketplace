@@ -1,0 +1,102 @@
+FAILURES I SAW WHILE USING A CODING AGENT ON API MARKETPLACE
+
+
+1. THE AGENT DECLARED CROSS-LAPTOP READINESS TOO EARLY
+
+How I noticed
+The agent initially said the application should work on another Mac because 15
+backend tests passed and the frontend built. When I asked if we were sure, a
+deeper flow returned diagnostics ready and registration 200, followed by
+inference 502. Another edge case collapsed two active machines into one record.
+
+What I think actually went wrong
+The agent treated local tests and a successful build as proof that the full
+runtime worked. It had not tested the exact model tag sent to Ollama or a
+conflict where a submitted name matched one machine and its URL matched another.
+The first answer was more confident than the evidence.
+
+What I did about it
+I challenged the initial verdict. The agent reproduced both failures, withdrew
+the ready-to-transfer conclusion, withheld the commit and push, and marked the
+two defects as release-blocking.
+
+
+2. THE AGENT CALLED THE CODE DEMO-READY BEFORE THE DEMO ENVIRONMENT WAS READY
+
+How I noticed
+The agent described the code as demo-ready after tests and builds passed. Its
+own live check then found that FastAPI and the dashboard were not running,
+Ollama listened only on localhost, Austin's machine was unreachable, the local
+IP had changed, and 16 files were still uncommitted.
+
+What I think actually went wrong
+The agent evaluated code readiness separately from operational readiness, but
+used language that blurred the two. For this product, the network, model
+processes, current IPs, firewall access, router, and dashboard are part of the
+demo. Green code checks alone did not make the demo functional.
+
+What I did about it
+The agent revised the assessment into a blocker checklist, verified the current
+IPs and Ollama bindings, required live curl checks from the router, and gave a
+specific service-start and rehearsal sequence.
+
+
+3. THE AGENT RELIED ON UNSTABLE NETWORK ADDRESSES
+
+How I noticed
+The agent added Alara's and Austin's private IP addresses to suppliers.json.
+Alara's address later changed from 10.206.120.18 to 10.206.50.21. The public
+Vercel frontend also could not directly reach private 10.x supplier machines.
+
+What I think actually went wrong
+The agent accepted point-in-time DHCP addresses as durable configuration before
+validating the network topology. It solved registration with static data even
+though the demo depended on changing local addresses and LAN reachability.
+
+What I did about it
+The agent began requiring both Macs to recheck their addresses immediately
+before the demo, recommended DHCP reservations or a controlled hotspot, and
+clarified that the LAN demo must use the local dashboard rather than the public
+Vercel frontend.
+
+
+4. THE AGENT'S FIRST UI PASS MISSED VISIBLE AND RUNTIME DEFECTS
+
+How I noticed
+After the functional frontend had been delivered, I supplied a screenshot of a
+visible alignment problem. Browser measurements showed that table checkboxes
+sat about two pixels above adjacent text. Responsive testing also exposed
+horizontal overflow and a hydration mismatch in the activity chart.
+
+What I think actually went wrong
+The agent relied too heavily on type checking and production builds. Those
+checks proved that the code compiled, but they did not prove that the rendered
+interface was aligned, responsive, or free of client hydration errors.
+
+What I did about it
+The agent measured the actual element geometry, fixed the shared checkbox style,
+reran browser checks, and verified the final subpixel difference. It also added
+mobile overflow handling, a usable navigation drawer, and a stable mounted state
+for the chart.
+
+
+5. THE AGENT'S SETUP GUIDANCE MADE CLAIMS IT HAD NOT VERIFIED
+
+How I noticed
+The cross-laptop review found that the setup described OLLAMA_HOST as permanent,
+although launchctl setenv had not been verified across logout or reboot. The
+helper installed qwen2.5-coder:1.5b while forms and documentation used the
+untagged qwen2.5-coder name.
+
+What I think actually went wrong
+The agent wrote documentation as if a plausible setup command and a similar
+model name were confirmed operating facts. The documentation, validation logic,
+and runtime request did not share one exact configuration contract.
+
+What I did about it
+The agent checked the platform guidance, downgraded the persistence claim,
+reproduced the model mismatch through the real API flow, and recommended either
+a verified LaunchAgent or session-scoped wording plus exact canonical model
+tags everywhere.
+
+
