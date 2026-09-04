@@ -255,6 +255,10 @@ export function useDashboard() {
               supplierName: e.supplierName ?? prev.supplierName,
               supplierId: e.supplierId ?? prev.supplierId,
               error: e.event === "request.failed" ? e.message ?? "Request failed" : prev.error,
+              finishedAt:
+                e.event === "request.completed" || e.event === "request.failed"
+                  ? Date.now()
+                  : prev.finishedAt,
             }));
           }
         }
@@ -329,11 +333,13 @@ export function useDashboard() {
 
     if (modeRef.current === "live") {
       setRequest({
+        historyId: crypto.randomUUID(),
         id: null,
         prompt: text,
         clientLabel: DASHBOARD_CLIENT,
         status: "received",
         stage: "toServer",
+        startedAt: Date.now(),
       });
       try {
         const res = await fetch(`${apiBaseUrl}/api/prompts`, {
@@ -351,6 +357,7 @@ export function useDashboard() {
             status: "failed",
             stage: "failed",
             error: data?.error ?? data?.detail ?? `Request failed (${res.status})`,
+            finishedAt: Date.now(),
           }));
           return;
         }
@@ -375,6 +382,7 @@ export function useDashboard() {
           status: "failed",
           stage: "failed",
           error: "Could not reach the central server.",
+          finishedAt: Date.now(),
         }));
       }
     }
